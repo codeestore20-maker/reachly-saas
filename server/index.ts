@@ -263,11 +263,8 @@ app.post('/api/extract-followers', authMiddleware, async (req: any, res) => {
       count: followers.length 
     });
 
-    res.json({ 
-      success: true, 
-      count: followers.length,
-      followers 
-    });
+    // Return array directly for frontend compatibility
+    res.json(followers);
 
   } catch (error) {
     logger.error('Extract followers error', { error });
