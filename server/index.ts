@@ -452,11 +452,20 @@ app.get('/api/dashboard/stats', authMiddleware, async (req: any, res) => {
 
 if (isProduction) {
   const distPath = path.join(__dirname, '../dist');
-  app.use(express.static(distPath));
   
-  // Catch-all route for SPA - must be last
-  app.get('/*', (req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
+  // Serve static files with fallback to index.html
+  app.use(express.static(distPath, { 
+    index: 'index.html',
+    fallthrough: true 
+  }));
+  
+  // Fallback for SPA routes - only for non-API routes
+  app.use((req, res, next) => {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/health')) {
+      res.sendFile(path.join(distPath, 'index.html'));
+    } else {
+      next();
+    }
   });
 }
 
