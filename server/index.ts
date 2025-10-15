@@ -4,6 +4,11 @@ import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { query, encrypt, initializeDatabase } from './db-postgres';
 import { hashPassword, verifyPassword, generateToken, verifyToken, createUser, getUserByEmail } from './auth';
 import { parseCookies, validateTwitterAccount, extractFollowers } from './twitter';
