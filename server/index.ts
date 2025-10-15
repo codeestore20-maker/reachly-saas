@@ -7,8 +7,8 @@ import path from 'path';
 import { query, encrypt } from './db-postgres';
 import { hashPassword, verifyPassword, generateToken, verifyToken, createUser, getUserByEmail } from './auth';
 import { parseCookies, validateTwitterAccount, extractFollowers } from './twitter';
-import { startCampaign, pauseCampaign, stopCampaign, resumeActiveCampaigns } from './campaign-runner';
-import { startFollowCampaign, pauseFollowCampaign, stopFollowCampaign, resumeActiveFollowCampaigns } from './follow-runner';
+import { startCampaign, pauseCampaign, stopCampaign, resumeActiveCampaigns } from './campaign-runner-disabled';
+import { startFollowCampaign, pauseFollowCampaign, stopFollowCampaign, resumeActiveFollowCampaigns } from './follow-runner-disabled';
 import { getQueueStats } from './queue';
 import logger from './logger';
 

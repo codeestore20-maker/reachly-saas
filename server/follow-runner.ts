@@ -1,4 +1,5 @@
-import db from './db';
+import { query } from './db-postgres';
+import logger from './logger';
 import { followUser } from './twitter';
 
 interface FollowCampaignConfig {

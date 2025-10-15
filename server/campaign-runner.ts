@@ -1,5 +1,6 @@
-import db from './db';
+import { query } from './db-postgres';
 import { sendDM } from './twitter';
+import logger from './logger';
 
 interface CampaignConfig {
   id: number;

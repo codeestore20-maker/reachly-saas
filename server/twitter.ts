@@ -1,4 +1,5 @@
-import { decrypt } from './db';
+import { decrypt } from './db-postgres';
+import logger from './logger';
 
 export interface TwitterCookies {
   auth_token: string;
