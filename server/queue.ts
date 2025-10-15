@@ -9,6 +9,13 @@ import logger from './logger';
 let redisClient: Redis | null = null;
 const redisUrl = process.env.REDIS_URL?.trim();
 
+// Debug: Log Redis URL status
+if (process.env.REDIS_URL) {
+  logger.info(`🔍 REDIS_URL found: ${redisUrl?.substring(0, 20)}...`);
+} else {
+  logger.info('🔍 REDIS_URL not found in environment');
+}
+
 if (redisUrl && redisUrl.length > 0 && redisUrl.startsWith('redis')) {
   logger.info('🔄 Connecting to Redis...');
   
