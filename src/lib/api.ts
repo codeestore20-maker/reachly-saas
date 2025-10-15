@@ -1,4 +1,9 @@
-const API_URL = 'http://localhost:3001/api';
+// Use environment variable for API URL, fallback to relative path in production
+const API_URL = import.meta.env.VITE_API_URL || (
+  import.meta.env.MODE === 'production' 
+    ? '/api'  // Same domain in production
+    : 'http://localhost:3001/api'  // Localhost in development
+);
 
 let authToken: string | null = localStorage.getItem('auth_token');
 
