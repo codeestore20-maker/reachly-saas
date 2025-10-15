@@ -73,14 +73,29 @@ function getEncryptionKey(): string {
 const ENCRYPTION_KEY = getEncryptionKey();
 
 // Validate encryption key
+console.log('🔍 DEBUG: Validating encryption key...');
+console.log(`🔍 DEBUG: Key length: ${ENCRYPTION_KEY?.length || 0}`);
+console.log(`🔍 DEBUG: Key preview: ${ENCRYPTION_KEY?.substring(0, 16)}...`);
+
 if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
-  logger.error(`❌ Invalid ENCRYPTION_KEY length: ${ENCRYPTION_KEY?.length || 0} (expected 64)`);
+  const errorMsg = `❌ Invalid ENCRYPTION_KEY length: ${ENCRYPTION_KEY?.length || 0} (expected 64)`;
+  console.error(errorMsg);
+  logger.error(errorMsg);
   logger.error('⚠️  Generating new valid key...');
   throw new Error('Invalid encryption key. Please check COOKIE_ENCRYPTION_KEY in environment variables.');
 }
 
+console.log('✅ Encryption key is valid!');
 logger.info(`🔑 Encryption key loaded: ${ENCRYPTION_KEY.substring(0, 8)}...`);
-const key = Buffer.from(ENCRYPTION_KEY, 'hex');
+
+let key: Buffer;
+try {
+  key = Buffer.from(ENCRYPTION_KEY, 'hex');
+  console.log('✅ Key buffer created successfully');
+} catch (error) {
+  console.error('❌ Failed to create key buffer:', error);
+  throw error;
+}
 
 export function encrypt(text: string): string {
   const iv = crypto.randomBytes(16);
