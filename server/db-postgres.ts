@@ -71,6 +71,15 @@ function getEncryptionKey(): string {
 
 // الحصول على مفتاح التشفير الثابت
 const ENCRYPTION_KEY = getEncryptionKey();
+
+// Validate encryption key
+if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
+  logger.error(`❌ Invalid ENCRYPTION_KEY length: ${ENCRYPTION_KEY?.length || 0} (expected 64)`);
+  logger.error('⚠️  Generating new valid key...');
+  throw new Error('Invalid encryption key. Please check COOKIE_ENCRYPTION_KEY in environment variables.');
+}
+
+logger.info(`🔑 Encryption key loaded: ${ENCRYPTION_KEY.substring(0, 8)}...`);
 const key = Buffer.from(ENCRYPTION_KEY, 'hex');
 
 export function encrypt(text: string): string {
