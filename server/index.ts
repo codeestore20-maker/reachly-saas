@@ -232,7 +232,7 @@ app.post('/api/extract-followers', authMiddleware, async (req: any, res) => {
 
     // Extract followers
     logger.info('Extracting followers', { accountId, targetUsername, quantity });
-    const followers = await extractFollowers(account.cookies, targetUsername, quantity);
+    const followers = await extractFollowers(account.encrypted_cookies, targetUsername, quantity);
 
     if (!followers || followers.length === 0) {
       return res.status(400).json({ error: 'No followers found or failed to extract' });
@@ -489,25 +489,6 @@ app.post('/api/follow-campaigns/:id/stop', authMiddleware, (req: any, res) => {
     res.json({ success: true });
   } catch (error) {
     logger.error('Stop follow campaign error', { error });
-    res.status(500).json({ error: (error as Error).message });
-  }
-});
-
-// ============ Followers Routes ============
-
-app.post('/api/followers/extract', authMiddleware, async (req: any, res) => {
-  try {
-    const { accountId, targetUsername, quantity } = req.body;
-    if (!accountId || !targetUsername) return res.status(400).json({ error: 'Account ID and target username required' });
-    
-    const result = await query('SELECT encrypted_cookies FROM accounts WHERE id = $1 AND user_id = $2', [accountId, req.user.id]);
-    if (!result.rows[0]) return res.status(404).json({ error: 'Account not found' });
-    
-    const followers = await extractFollowers(result.rows[0].encrypted_cookies, targetUsername, quantity || 100);
-    logger.info('Followers extracted', { userId: req.user.id, count: followers.length });
-    res.json(followers);
-  } catch (error) {
-    logger.error('Extract followers error', { error });
     res.status(500).json({ error: (error as Error).message });
   }
 });
