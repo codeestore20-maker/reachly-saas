@@ -5,15 +5,17 @@ import logger from './logger';
 // ============ Redis Configuration ============
 
 // إنشاء Redis client للاستخدام العام
-// Only if REDIS_URL is explicitly set
+// Only if REDIS_URL is explicitly set and not empty
 let redisClient: Redis | null = null;
+const redisUrl = process.env.REDIS_URL?.trim();
 
-if (process.env.REDIS_URL) {
+if (redisUrl && redisUrl.length > 0 && redisUrl.startsWith('redis')) {
   logger.info('🔄 Connecting to Redis...');
   
-  redisClient = new Redis(process.env.REDIS_URL, {
+  redisClient = new Redis(redisUrl, {
     maxRetriesPerRequest: 3,
     enableReadyCheck: false,
+    lazyConnect: true, // Don't connect immediately
     retryStrategy: (times) => {
       if (times > 3) {
         logger.error('❌ Redis connection failed after 3 attempts');
@@ -35,6 +37,12 @@ if (process.env.REDIS_URL) {
   redisClient.on('close', () => {
     logger.warn('⚠️  Redis connection closed');
   });
+
+  // Try to connect
+  redisClient.connect().catch((err) => {
+    logger.error('❌ Failed to connect to Redis', { error: err.message });
+    redisClient = null; // Disable Redis if connection fails
+  });
 } else {
   logger.warn('⚠️  REDIS_URL not set - Queue system disabled');
 }
@@ -46,56 +54,64 @@ export { redisClient };
 let campaignQueue: Bull.Queue | null = null;
 let followQueue: Bull.Queue | null = null;
 
-if (process.env.REDIS_URL && redisClient) {
-  try {
-    const queueOptions = {
-      redis: process.env.REDIS_URL,
-      defaultJobOptions: {
-        attempts: 3,
-        backoff: {
-          type: 'exponential' as const,
-          delay: 2000,
-        },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
-    };
+// Don't initialize queues at all if Redis is not available
+if (redisUrl && redisUrl.length > 0 && redisUrl.startsWith('redis')) {
+  // Wait a bit for Redis connection to establish
+  setTimeout(() => {
+    if (redisClient && redisClient.status === 'ready') {
+      try {
+        const queueOptions = {
+          redis: redisUrl,
+          defaultJobOptions: {
+            attempts: 3,
+            backoff: {
+              type: 'exponential' as const,
+              delay: 2000,
+            },
+            removeOnComplete: 100,
+            removeOnFail: 200,
+          },
+        };
 
-    // ============ Campaign Queues ============
+        // ============ Campaign Queues ============
 
-    campaignQueue = new Bull('dm-campaigns', queueOptions);
+        campaignQueue = new Bull('dm-campaigns', queueOptions);
 
-    campaignQueue.on('error', (error) => {
-      logger.error('❌ Campaign queue error', { error: error.message });
-    });
+        campaignQueue.on('error', (error) => {
+          logger.error('❌ Campaign queue error', { error: error.message });
+        });
 
-    campaignQueue.on('completed', (job, result) => {
-      logger.info('✅ Campaign job completed', { jobId: job.id, result });
-    });
+        campaignQueue.on('completed', (job, result) => {
+          logger.info('✅ Campaign job completed', { jobId: job.id, result });
+        });
 
-    campaignQueue.on('failed', (job, err) => {
-      logger.error('❌ Campaign job failed', { jobId: job?.id, error: err.message });
-    });
+        campaignQueue.on('failed', (job, err) => {
+          logger.error('❌ Campaign job failed', { jobId: job?.id, error: err.message });
+        });
 
-    followQueue = new Bull('follow-campaigns', queueOptions);
+        followQueue = new Bull('follow-campaigns', queueOptions);
 
-    followQueue.on('error', (error) => {
-      logger.error('❌ Follow queue error', { error: error.message });
-    });
+        followQueue.on('error', (error) => {
+          logger.error('❌ Follow queue error', { error: error.message });
+        });
 
-    followQueue.on('completed', (job, result) => {
-      logger.info('✅ Follow job completed', { jobId: job.id, result });
-    });
+        followQueue.on('completed', (job, result) => {
+          logger.info('✅ Follow job completed', { jobId: job.id, result });
+        });
 
-    followQueue.on('failed', (job, err) => {
-      logger.error('❌ Follow job failed', { jobId: job?.id, error: err.message });
-    });
+        followQueue.on('failed', (job, err) => {
+          logger.error('❌ Follow job failed', { jobId: job?.id, error: err.message });
+        });
 
-    logger.info('✅ Queue system initialized');
-  } catch (error) {
-    logger.error('❌ Failed to initialize queue system', { error });
-    logger.warn('⚠️  Continuing without queue system');
-  }
+        logger.info('✅ Queue system initialized');
+      } catch (error) {
+        logger.error('❌ Failed to initialize queue system', { error });
+        logger.warn('⚠️  Continuing without queue system');
+      }
+    } else {
+      logger.warn('⚠️  Redis not ready - Queue system disabled');
+    }
+  }, 1000); // Wait 1 second for Redis to connect
 } else {
   logger.warn('⚠️  Queue system disabled - REDIS_URL not set');
 }
