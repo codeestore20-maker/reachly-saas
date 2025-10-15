@@ -4,18 +4,22 @@ import logger from './logger';
 
 // ============ Redis Configuration ============
 
-const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-
 // إنشاء Redis client للاستخدام العام
-// Temporarily disabled if REDIS_URL is not set
+// Only if REDIS_URL is explicitly set
 let redisClient: Redis | null = null;
 
 if (process.env.REDIS_URL) {
-  redisClient = new Redis(redisUrl, {
-    maxRetriesPerRequest: null,
+  logger.info('🔄 Connecting to Redis...');
+  
+  redisClient = new Redis(process.env.REDIS_URL, {
+    maxRetriesPerRequest: 3,
     enableReadyCheck: false,
     retryStrategy: (times) => {
-      const delay = Math.min(times * 50, 2000);
+      if (times > 3) {
+        logger.error('❌ Redis connection failed after 3 attempts');
+        return null; // Stop retrying
+      }
+      const delay = Math.min(times * 1000, 3000);
       return delay;
     },
   });
@@ -25,7 +29,11 @@ if (process.env.REDIS_URL) {
   });
 
   redisClient.on('error', (err) => {
-    logger.error('❌ Redis connection error', { error: err });
+    logger.error('❌ Redis connection error', { error: err.message });
+  });
+
+  redisClient.on('close', () => {
+    logger.warn('⚠️  Redis connection closed');
   });
 } else {
   logger.warn('⚠️  REDIS_URL not set - Queue system disabled');
@@ -38,51 +46,56 @@ export { redisClient };
 let campaignQueue: Bull.Queue | null = null;
 let followQueue: Bull.Queue | null = null;
 
-if (process.env.REDIS_URL) {
-  const queueOptions = {
-    redis: redisUrl,
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: {
-        type: 'exponential',
-        delay: 2000,
+if (process.env.REDIS_URL && redisClient) {
+  try {
+    const queueOptions = {
+      redis: process.env.REDIS_URL,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+          type: 'exponential' as const,
+          delay: 2000,
+        },
+        removeOnComplete: 100,
+        removeOnFail: 200,
       },
-      removeOnComplete: 100,
-      removeOnFail: 200,
-    },
-  };
+    };
 
-  // ============ Campaign Queues ============
+    // ============ Campaign Queues ============
 
-  campaignQueue = new Bull('dm-campaigns', queueOptions);
+    campaignQueue = new Bull('dm-campaigns', queueOptions);
 
-  campaignQueue.on('error', (error) => {
-    logger.error('❌ Campaign queue error', { error });
-  });
+    campaignQueue.on('error', (error) => {
+      logger.error('❌ Campaign queue error', { error: error.message });
+    });
 
-  campaignQueue.on('completed', (job, result) => {
-    logger.info('✅ Campaign job completed', { jobId: job.id, result });
-  });
+    campaignQueue.on('completed', (job, result) => {
+      logger.info('✅ Campaign job completed', { jobId: job.id, result });
+    });
 
-  campaignQueue.on('failed', (job, err) => {
-    logger.error('❌ Campaign job failed', { jobId: job?.id, error: err });
-  });
+    campaignQueue.on('failed', (job, err) => {
+      logger.error('❌ Campaign job failed', { jobId: job?.id, error: err.message });
+    });
 
-  followQueue = new Bull('follow-campaigns', queueOptions);
+    followQueue = new Bull('follow-campaigns', queueOptions);
 
-  followQueue.on('error', (error) => {
-    logger.error('❌ Follow queue error', { error });
-  });
+    followQueue.on('error', (error) => {
+      logger.error('❌ Follow queue error', { error: error.message });
+    });
 
-  followQueue.on('completed', (job, result) => {
-    logger.info('✅ Follow job completed', { jobId: job.id, result });
-  });
+    followQueue.on('completed', (job, result) => {
+      logger.info('✅ Follow job completed', { jobId: job.id, result });
+    });
 
-  followQueue.on('failed', (job, err) => {
-    logger.error('❌ Follow job failed', { jobId: job?.id, error: err });
-  });
+    followQueue.on('failed', (job, err) => {
+      logger.error('❌ Follow job failed', { jobId: job?.id, error: err.message });
+    });
 
-  logger.info('✅ Queue system initialized');
+    logger.info('✅ Queue system initialized');
+  } catch (error) {
+    logger.error('❌ Failed to initialize queue system', { error });
+    logger.warn('⚠️  Continuing without queue system');
+  }
 } else {
   logger.warn('⚠️  Queue system disabled - REDIS_URL not set');
 }
