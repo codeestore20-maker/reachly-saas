@@ -451,9 +451,12 @@ app.get('/api/dashboard/stats', authMiddleware, async (req: any, res) => {
 // ============ Serve Static Files (Production) ============
 
 if (isProduction) {
-  app.use(express.static(path.join(__dirname, '../dist')));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../dist/index.html'));
+  const distPath = path.join(__dirname, '../dist');
+  app.use(express.static(distPath));
+  
+  // Catch-all route for SPA - must be last
+  app.get('/*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
   });
 }
 
