@@ -203,6 +203,73 @@ app.delete('/api/accounts/:id', authMiddleware, async (req: any, res) => {
   }
 });
 
+// ============ Extract Followers Route ============
+
+app.post('/api/extract-followers', authMiddleware, async (req: any, res) => {
+  try {
+    const { accountId, targetUsername, quantity } = req.body;
+    
+    if (!accountId || !targetUsername || !quantity) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Get account
+    const accountResult = await query(
+      'SELECT * FROM accounts WHERE id = $1 AND user_id = $2',
+      [accountId, req.user.id]
+    );
+
+    if (!accountResult.rows[0]) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    const account = accountResult.rows[0];
+
+    // Extract followers
+    logger.info('Extracting followers', { accountId, targetUsername, quantity });
+    const followers = await extractFollowers(account.cookies, targetUsername, quantity);
+
+    if (!followers || followers.length === 0) {
+      return res.status(400).json({ error: 'No followers found or failed to extract' });
+    }
+
+    // Store followers in database
+    for (const follower of followers) {
+      await query(`
+        INSERT INTO followers (user_id, account_id, username, name, profile_url, extracted_from)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (user_id, username) DO UPDATE SET
+          name = EXCLUDED.name,
+          profile_url = EXCLUDED.profile_url,
+          extracted_from = EXCLUDED.extracted_from
+      `, [
+        req.user.id,
+        accountId,
+        follower.username,
+        follower.name,
+        follower.avatar,
+        targetUsername
+      ]);
+    }
+
+    logger.info('Followers extracted successfully', { 
+      accountId, 
+      targetUsername, 
+      count: followers.length 
+    });
+
+    res.json({ 
+      success: true, 
+      count: followers.length,
+      followers 
+    });
+
+  } catch (error) {
+    logger.error('Extract followers error', { error });
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 // ============ Campaigns Routes ============
 
 app.get('/api/campaigns', authMiddleware, async (req: any, res) => {
