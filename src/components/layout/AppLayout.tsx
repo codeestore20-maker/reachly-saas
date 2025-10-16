@@ -5,9 +5,9 @@ import { AuthGuard } from '../AuthGuard';
 export const AppLayout = () => {
   return (
     <AuthGuard>
-      <div className="flex min-h-screen w-full bg-background">
+      <div className="min-h-screen w-full bg-background">
         <Sidebar />
-        <main className="flex-1 overflow-auto">
+        <main className="ml-64 min-h-screen overflow-auto">
           <Outlet />
         </main>
       </div>

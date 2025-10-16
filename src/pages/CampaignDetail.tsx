@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { campaigns } from '@/lib/api';
 import { toast } from 'sonner';
+import { DetailSkeleton } from '@/components/loading/PageSkeleton';
 
 export default function CampaignDetail() {
   const { id } = useParams();
@@ -97,7 +98,7 @@ export default function CampaignDetail() {
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-background p-8"><div className="text-center">Loading...</div></div>;
+    return <DetailSkeleton />;
   }
 
   if (!campaign) {

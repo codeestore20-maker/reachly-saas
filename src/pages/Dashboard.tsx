@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { dashboard, campaigns as campaignsAPI } from '@/lib/api';
+import { DashboardSkeleton } from '@/components/loading/PageSkeleton';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -30,6 +31,10 @@ export default function Dashboard() {
       setLoading(false);
     }
   };
+  
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
   
   const totalDMs = stats.totalDMs;
   const activeCampaigns = stats.activeCampaigns;

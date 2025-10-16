@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, Play, Pause, StopCircle, Edit } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { campaigns as campaignsAPI } from '@/lib/api';
+import { CampaignsSkeleton } from '@/components/loading/PageSkeleton';
 
 export default function Campaigns() {
   const navigate = useNavigate();
@@ -75,7 +76,7 @@ export default function Campaigns() {
   });
   
   if (loading) {
-    return <div className="min-h-screen bg-background p-8"><div className="text-center">Loading...</div></div>;
+    return <CampaignsSkeleton />;
   }
 
   return (

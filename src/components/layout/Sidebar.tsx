@@ -22,8 +22,8 @@ const navigation = [
 
 export const Sidebar = () => {
   return (
-    <div className="flex w-64 flex-col border-r border-border bg-card">
-      <div className="flex h-16 items-center gap-2 border-b border-border px-6">
+    <div className="fixed left-0 top-0 flex h-screen w-64 flex-col border-r border-border bg-card">
+      <div className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-6">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary">
           <Sparkles className="h-5 w-5 text-primary-foreground" />
         </div>
@@ -32,7 +32,7 @@ export const Sidebar = () => {
         </span>
       </div>
 
-      <nav className="flex-1 space-y-1 p-4">
+      <nav className="flex-1 space-y-1 overflow-y-auto p-4">
         {navigation.map((item) => (
           <NavLink
             key={item.name}
@@ -51,7 +51,7 @@ export const Sidebar = () => {
         ))}
       </nav>
 
-      <div className="border-t border-border p-4">
+      <div className="shrink-0 border-t border-border p-4">
         <div className="flex items-center gap-3 rounded-lg bg-muted p-3">
           <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center text-primary-foreground font-semibold">
             {localStorage.getItem('user_email')?.charAt(0).toUpperCase() || 'U'}

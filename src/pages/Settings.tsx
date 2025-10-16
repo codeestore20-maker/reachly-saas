@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { clearAuthToken, userSettings } from '@/lib/api';
 import { useEffect, useState } from 'react';
+import { SettingsSkeleton } from '@/components/loading/PageSkeleton';
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -81,7 +82,7 @@ export default function Settings() {
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-background p-8"><div className="text-center">Loading...</div></div>;
+    return <SettingsSkeleton />;
   }
 
   return (
