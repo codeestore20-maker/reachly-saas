@@ -135,7 +135,14 @@ export default function CampaignDetail() {
               <Button 
                 variant="default" 
                 className="bg-gradient-primary"
-                onClick={() => navigate(`/campaigns/wizard?edit=${campaign.id}`)}
+                onClick={() => {
+                  console.log('Draft campaign ID from detail:', campaign.id);
+                  if (!campaign.id) {
+                    console.error('Campaign ID is missing!', campaign);
+                    return;
+                  }
+                  navigate(`/campaigns/wizard?edit=${campaign.id}`);
+                }}
                 title="Continue editing draft"
               >
                 <Edit className="mr-2 h-4 w-4" />

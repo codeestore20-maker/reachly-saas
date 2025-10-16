@@ -150,7 +150,14 @@ export default function FollowCampaignDetail() {
               <Button 
                 variant="default" 
                 className="bg-gradient-primary"
-                onClick={() => navigate(`/follow-campaigns/wizard?edit=${campaign.id}`)}
+                onClick={() => {
+                  console.log('Draft follow campaign ID from detail:', campaign.id);
+                  if (!campaign.id) {
+                    console.error('Campaign ID is missing!', campaign);
+                    return;
+                  }
+                  navigate(`/follow-campaigns/wizard?edit=${campaign.id}`);
+                }}
                 title="Continue editing draft"
               >
                 <Edit className="mr-2 h-4 w-4" />

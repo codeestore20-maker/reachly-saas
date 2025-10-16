@@ -184,6 +184,11 @@ export default function Campaigns() {
                       className="bg-gradient-primary"
                       onClick={(e) => {
                         e.stopPropagation();
+                        console.log('Draft campaign ID:', campaign.id);
+                        if (!campaign.id) {
+                          console.error('Campaign ID is missing!', campaign);
+                          return;
+                        }
                         navigate(`/campaigns/wizard?edit=${campaign.id}`);
                       }}
                       title="Continue editing draft"
