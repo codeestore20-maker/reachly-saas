@@ -18,18 +18,26 @@ if (process.env.REDIS_URL) {
 
 if (redisUrl && redisUrl.length > 0 && redisUrl.startsWith('redis')) {
   logger.info('🔄 Connecting to Redis...');
+  logger.info(`🔗 Redis URL: ${redisUrl.includes('railway.internal') ? 'Internal Railway Network' : 'Public Network'}`);
   
   redisClient = new Redis(redisUrl, {
     maxRetriesPerRequest: 3,
     enableReadyCheck: false,
     lazyConnect: true, // Don't connect immediately
+    connectTimeout: 10000, // 10 seconds timeout
     retryStrategy: (times) => {
       if (times > 3) {
         logger.error('❌ Redis connection failed after 3 attempts');
+        logger.error('💡 Tip: Make sure Redis service is running and accessible');
         return null; // Stop retrying
       }
       const delay = Math.min(times * 1000, 3000);
+      logger.info(`⏳ Retry ${times}/3 in ${delay}ms...`);
       return delay;
+    },
+    reconnectOnError: (err) => {
+      logger.error('❌ Redis error, attempting reconnect...', { error: err.message });
+      return true;
     },
   });
 
