@@ -13,6 +13,7 @@ if (!JWT_SECRET) {
 export interface User {
   id: number;
   email: string;
+  role?: string;
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -24,13 +25,13 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 export function generateToken(user: User): string {
-  return jwt.sign({ id: user.id, email: user.email }, JWT_SECRET!, { expiresIn: '7d' });
+  return jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET!, { expiresIn: '7d' });
 }
 
 export function verifyToken(token: string): User | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET!) as any;
-    return { id: decoded.id, email: decoded.email };
+    return { id: decoded.id, email: decoded.email, role: decoded.role };
   } catch {
     return null;
   }
