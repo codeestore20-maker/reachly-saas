@@ -15,10 +15,12 @@ export default function FollowCampaignDetail() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadCampaign();
-    const interval = setInterval(loadCampaign, 5000);
-    return () => clearInterval(interval);
-  }, [id]);
+    if (id) {
+      loadCampaign();
+      const interval = setInterval(loadCampaign, 5000);
+      return () => clearInterval(interval);
+    }
+  }, []); // Only run once on mount
 
   const loadCampaign = async () => {
     try {

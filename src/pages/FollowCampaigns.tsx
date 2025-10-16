@@ -18,15 +18,13 @@ export default function FollowCampaigns() {
   useEffect(() => {
     loadCampaigns();
     
+    // Poll every 5 seconds only if there are active campaigns
     const interval = setInterval(() => {
-      const hasActiveCampaigns = campaigns.some(c => c.status === 'active');
-      if (hasActiveCampaigns) {
-        loadCampaigns();
-      }
+      loadCampaigns();
     }, 5000);
     
     return () => clearInterval(interval);
-  }, [campaigns]);
+  }, []); // Empty dependency array - only run once on mount
   
   const loadCampaigns = async () => {
     try {

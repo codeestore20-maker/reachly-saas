@@ -18,16 +18,13 @@ export default function Campaigns() {
   useEffect(() => {
     loadCampaigns();
     
-    // Auto-refresh كل 5 ثوانٍ إذا كان هناك حملات نشطة
+    // Auto-refresh every 5 seconds
     const interval = setInterval(() => {
-      const hasActiveCampaigns = campaignsList.some(c => c.status === 'active');
-      if (hasActiveCampaigns) {
-        loadCampaigns();
-      }
+      loadCampaigns();
     }, 5000);
     
     return () => clearInterval(interval);
-  }, [campaignsList]);
+  }, []); // Empty dependency array - only run once on mount
   
   const loadCampaigns = async () => {
     try {
