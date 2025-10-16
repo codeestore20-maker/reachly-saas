@@ -56,6 +56,7 @@ export default function FollowCampaignWizard() {
   });
 
   useEffect(() => {
+    console.log('FollowCampaignWizard editId:', editId);
     if (editId) {
       loadDraft(editId);
     }
@@ -63,8 +64,10 @@ export default function FollowCampaignWizard() {
 
   const loadDraft = async (id: string) => {
     try {
+      console.log('Loading follow draft with ID:', id);
       const { followCampaigns } = await import('@/lib/api');
       const campaign = await followCampaigns.get(Number(id));
+      console.log('Loaded follow campaign:', campaign);
       
       setDraft({
         name: campaign.name || '',

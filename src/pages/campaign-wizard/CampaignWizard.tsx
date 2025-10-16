@@ -64,6 +64,7 @@ export default function CampaignWizard() {
   });
 
   useEffect(() => {
+    console.log('CampaignWizard editId:', editId);
     if (editId) {
       loadDraft(editId);
     }
@@ -71,8 +72,10 @@ export default function CampaignWizard() {
 
   const loadDraft = async (id: string) => {
     try {
+      console.log('Loading draft with ID:', id);
       const { campaigns } = await import('@/lib/api');
       const campaign = await campaigns.get(Number(id));
+      console.log('Loaded campaign:', campaign);
       
       setDraft({
         name: campaign.name || '',
