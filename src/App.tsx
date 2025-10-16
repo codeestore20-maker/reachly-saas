@@ -13,7 +13,6 @@ import FollowCampaigns from "./pages/FollowCampaigns";
 import FollowCampaignDetail from "./pages/FollowCampaignDetail";
 import FollowCampaignWizard from "./pages/follow-wizard/FollowCampaignWizard";
 import Accounts from "./pages/Accounts";
-import Conversations from "./pages/Conversations";
 import Settings from "./pages/Settings";
 import Plans from "./pages/Plans";
 import NotFound from "./pages/NotFound";
@@ -39,7 +38,6 @@ const App = () => (
             <Route path="/follow-campaigns/wizard" element={<FollowCampaignWizard />} />
             <Route path="/follow-campaigns/:id" element={<FollowCampaignDetail />} />
             <Route path="/accounts" element={<Accounts />} />
-            <Route path="/conversations" element={<Conversations />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/plans" element={<Plans />} />
           </Route>

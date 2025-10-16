@@ -3,7 +3,6 @@ import {
   LayoutDashboard,
   Send,
   Users,
-  MessageSquare,
   Settings,
   CreditCard,
   Sparkles,
@@ -15,7 +14,6 @@ const navigation = [
   { name: 'Campaigns', href: '/campaigns', icon: Send },
   { name: 'Follow Campaigns', href: '/follow-campaigns', icon: UserPlus },
   { name: 'Accounts', href: '/accounts', icon: Users },
-  { name: 'Conversations', href: '/conversations', icon: MessageSquare },
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Plans', href: '/plans', icon: CreditCard },
 ];

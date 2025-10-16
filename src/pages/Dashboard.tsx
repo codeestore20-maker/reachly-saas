@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Send, Users, MessageSquare, TrendingUp } from 'lucide-react';
+import { Send, Users, TrendingUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -45,7 +45,7 @@ export default function Dashboard() {
     { label: 'Total DMs Sent', value: totalDMs, icon: Send, color: 'text-primary' },
     { label: 'Active Campaigns', value: activeCampaigns, icon: TrendingUp, color: 'text-success' },
     { label: 'Connected Accounts', value: totalAccounts, icon: Users, color: 'text-warning' },
-    { label: 'Reply Rate', value: `${replyRate}%`, icon: MessageSquare, color: 'text-primary' },
+    { label: 'Reply Rate', value: `${replyRate}%`, icon: TrendingUp, color: 'text-primary' },
   ];
   
   if (loading) {
@@ -123,9 +123,9 @@ export default function Dashboard() {
                 <Users className="mr-2 h-4 w-4" />
                 Manage Accounts
               </Button>
-              <Button onClick={() => navigate('/conversations')} variant="outline" className="justify-start">
-                <MessageSquare className="mr-2 h-4 w-4" />
-                View Conversations
+              <Button onClick={() => navigate('/settings')} variant="outline" className="justify-start">
+                <Users className="mr-2 h-4 w-4" />
+                Account Settings
               </Button>
             </div>
           </Card>
