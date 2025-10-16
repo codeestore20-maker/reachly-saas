@@ -659,11 +659,12 @@ app.get('/api/dashboard/stats', authMiddleware, async (req: any, res) => {
 // Get user profile
 app.get('/api/user/profile', authMiddleware, async (req: any, res) => {
   try {
-    const result = await query('SELECT id, email, first_name, last_name, avatar, created_at FROM users WHERE id = $1', [req.user.id]);
+    const result = await query('SELECT id, email, first_name, last_name, avatar, role, created_at FROM users WHERE id = $1', [req.user.id]);
     if (!result.rows[0]) return res.status(404).json({ error: 'User not found' });
+    
     res.json(result.rows[0]);
   } catch (error) {
-    logger.error('Get user profile error', { error });
+    logger.error('Get profile error', { error });
     res.status(500).json({ error: (error as Error).message });
   }
 });
