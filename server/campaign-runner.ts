@@ -20,82 +20,74 @@ interface MessageLog {
 }
 
 const runningCampaigns = new Map<number, NodeJS.Timeout>();
-const messageLog = new Map<number, MessageLog[]>(); // تتبع الرسائل المرسلة لكل حملة
-const processingCampaigns = new Set<number>(); // تتبع الحملات التي يتم معالجتها حالياً
+const messageLog = new Map<number, MessageLog[]>();
+const processingCampaigns = new Set<number>();
 
 // بدء حملة
-export function startCampaign(campaignId: number) {
+export async function startCampaign(campaignId: number) {
   if (runningCampaigns.has(campaignId)) {
     console.log(`Campaign ${campaignId} is already running`);
     return;
   }
 
-  // تحديث الحالة
-  db.prepare('UPDATE campaigns SET status = ? WHERE id = ?').run('active', campaignId);
+  await query('UPDATE campaigns SET status = $1 WHERE id = $2', ['active', campaignId]);
 
-  // تهيئة سجل الرسائل
   if (!messageLog.has(campaignId)) {
     messageLog.set(campaignId, []);
   }
 
-  // بدء المعالجة - كل ثانية للتحقق من الشروط
   const interval = setInterval(() => {
     processCampaign(campaignId);
-  }, 1000); // كل ثانية
+  }, 1000);
 
   runningCampaigns.set(campaignId, interval);
-  console.log(`✅ Campaign ${campaignId} started`);
+  console.log(`▶️  Campaign ${campaignId} started`);
 }
 
-// إيقاف حملة مؤقتاً
-export function pauseCampaign(campaignId: number) {
+// إيقاف مؤقت للحملة
+export async function pauseCampaign(campaignId: number) {
   const interval = runningCampaigns.get(campaignId);
   if (interval) {
     clearInterval(interval);
     runningCampaigns.delete(campaignId);
   }
   
-  db.prepare('UPDATE campaigns SET status = ? WHERE id = ?').run('paused', campaignId);
+  await query('UPDATE campaigns SET status = $1 WHERE id = $2', ['paused', campaignId]);
   console.log(`⏸️  Campaign ${campaignId} paused`);
 }
 
-// إيقاف حملة نهائياً
-export function stopCampaign(campaignId: number) {
+// إيقاف نهائي للحملة
+export async function stopCampaign(campaignId: number) {
   const interval = runningCampaigns.get(campaignId);
   if (interval) {
     clearInterval(interval);
     runningCampaigns.delete(campaignId);
   }
   
-  // تنظيف سجل الرسائل
+  processingCampaigns.delete(campaignId);
   messageLog.delete(campaignId);
   
-  db.prepare('UPDATE campaigns SET status = ? WHERE id = ?').run('completed', campaignId);
+  await query('UPDATE campaigns SET status = $1 WHERE id = $2', ['completed', campaignId]);
   console.log(`⏹️  Campaign ${campaignId} stopped`);
 }
 
-// حساب عدد الرسائل المرسلة في الدقيقة الأخيرة
-function getMessagesInLastMinute(campaignId: number): number {
-  const logs = messageLog.get(campaignId) || [];
-  const oneMinuteAgo = Date.now() - 60000; // 60 ثانية
-  
-  // تنظيف السجلات القديمة
-  const recentLogs = logs.filter(log => log.timestamp > oneMinuteAgo);
-  messageLog.set(campaignId, recentLogs);
-  
-  return recentLogs.length;
-}
-
-// تسجيل رسالة مرسلة
 function logMessage(campaignId: number) {
   const logs = messageLog.get(campaignId) || [];
   logs.push({ timestamp: Date.now(), campaignId });
   messageLog.set(campaignId, logs);
+  
+  const oneMinuteAgo = Date.now() - 60000;
+  const recentLogs = logs.filter(log => log.timestamp > oneMinuteAgo);
+  messageLog.set(campaignId, recentLogs);
 }
 
-// معالجة حملة
+function getMessagesInLastMinute(campaignId: number): number {
+  const logs = messageLog.get(campaignId) || [];
+  const oneMinuteAgo = Date.now() - 60000;
+  return logs.filter(log => log.timestamp > oneMinuteAgo).length;
+}
+
 async function processCampaign(campaignId: number) {
-  // ✅ منع المعالجة المتزامنة - إذا كانت الحملة قيد المعالجة، انتظر
   if (processingCampaigns.has(campaignId)) {
     return;
   }
@@ -103,176 +95,156 @@ async function processCampaign(campaignId: number) {
   processingCampaigns.add(campaignId);
   
   try {
-    // الحصول على معلومات الحملة
-    const campaign = db.prepare(`
+    const campaignResult = await query(`
       SELECT c.*, a.encrypted_cookies
       FROM campaigns c
       JOIN accounts a ON c.account_id = a.id
-      WHERE c.id = ? AND c.status = 'active'
-    `).get(campaignId) as CampaignConfig | undefined;
+      WHERE c.id = $1 AND c.status = 'active'
+    `, [campaignId]);
 
-    if (!campaign) {
-      pauseCampaign(campaignId);
+    if (!campaignResult.rows[0]) {
+      stopCampaign(campaignId);
       return;
     }
 
-    // ✅ التحقق من معدل الإرسال في الدقيقة
+    const campaign = campaignResult.rows[0] as CampaignConfig;
     const messagesInLastMinute = getMessagesInLastMinute(campaignId);
+
     if (messagesInLastMinute >= campaign.pacing_per_minute) {
-      // وصلنا للحد الأقصى في الدقيقة - انتظر
+      processingCampaigns.delete(campaignId);
       return;
     }
 
-    // ✅ التحقق من الحد اليومي (محاولات الإرسال الفعلية)
     const today = new Date().toISOString().split('T')[0];
-    const attemptsToday = db.prepare(`
+    const attemptsTodayResult = await query(`
       SELECT COUNT(*) as count
       FROM targets
-      WHERE campaign_id = ? 
-        AND (status = 'sent' OR retry_count > 0)
-        AND DATE(COALESCE(sent_at, last_attempt_at)) = ?
-    `).get(campaignId, today) as { count: number };
+      WHERE campaign_id = $1 
+        AND DATE(last_attempt_at) = $2
+    `, [campaignId, today]);
+
+    const attemptsToday = attemptsTodayResult.rows[0];
 
     if (attemptsToday.count >= campaign.pacing_daily_cap) {
-      console.log(`⚠️  Campaign ${campaignId} reached daily cap (${campaign.pacing_daily_cap} attempts)`);
-      pauseCampaign(campaignId);
+      console.log(`⏸️  Campaign ${campaignId} reached daily cap (${campaign.pacing_daily_cap})`);
+      processingCampaigns.delete(campaignId);
       return;
     }
 
-    // ✅ الحصول على الهدف التالي (pending أو failed مع محاولات متبقية)
-    const target = db.prepare(`
+    const targetResult = await query(`
       SELECT * FROM targets
-      WHERE campaign_id = ? 
+      WHERE campaign_id = $1 
         AND status != 'sent'
-        AND retry_count < ?
-      ORDER BY 
-        CASE WHEN status = 'pending' THEN 0 ELSE 1 END,
-        id ASC
+        AND (status = 'pending' OR (status = 'failed' AND retry_count < $2))
+      ORDER BY created_at ASC
       LIMIT 1
-    `).get(campaignId, campaign.pacing_retry_attempts) as any;
+    `, [campaignId, campaign.pacing_retry_attempts]);
+
+    const target = targetResult.rows[0];
 
     if (!target) {
-      // لا توجد أهداف متبقية
       console.log(`✅ Campaign ${campaignId} completed - no more targets`);
       stopCampaign(campaignId);
       return;
     }
 
-    // ✅ التحقق من عدم إرسال رسالة مكررة لنفس المستخدم
-    const alreadySent = db.prepare(`
+    const alreadySentResult = await query(`
       SELECT COUNT(*) as count
       FROM targets
-      WHERE campaign_id = ? AND username = ? AND status = 'sent'
-    `).get(campaignId, target.username) as { count: number };
+      WHERE campaign_id = $1 AND username = $2 AND status = 'sent'
+    `, [campaignId, target.username]);
 
-    if (alreadySent.count > 0) {
-      // تم الإرسال بالفعل - تخطي
-      db.prepare(`
+    if (alreadySentResult.rows[0].count > 0) {
+      await query(`
         UPDATE targets
         SET status = 'skipped', error_message = 'Already sent to this user'
-        WHERE id = ?
-      `).run(target.id);
+        WHERE id = $1
+      `, [target.id]);
+      processingCampaigns.delete(campaignId);
       return;
     }
 
-    // تخصيص الرسالة
+    const currentRetryCount = target.retry_count || 0;
+    const isRetry = currentRetryCount > 0;
+    const attemptNumber = currentRetryCount + 1;
+
     const message = campaign.message_template
       .replace(/\{\{name\}\}/g, target.name || target.username)
-      .replace(/\{\{username\}\}/g, target.handle);
+      .replace(/\{\{username\}\}/g, target.username);
 
-    // ✅ حساب التأخير العشوائي
-    const delay = Math.random() * (campaign.pacing_delay_max - campaign.pacing_delay_min) + campaign.pacing_delay_min;
+    console.log(`📤 [Campaign ${campaignId}] ${isRetry ? `Retry #${attemptNumber}` : 'Sending'} to ${target.username}`);
     
-    const attemptNumber = target.retry_count + 1;
-    const isRetry = target.retry_count > 0;
-    
-    console.log(`📤 [Campaign ${campaignId}] ${isRetry ? `Retry #${attemptNumber}` : 'Sending'} to ${target.username} (${messagesInLastMinute + 1}/${campaign.pacing_per_minute} per min, ${attemptsToday.count + 1}/${campaign.pacing_daily_cap} today)`);
-    
-    // ✅ تحديث retry_count و last_attempt_at قبل الإرسال
-    db.prepare(`
+    await query(`
       UPDATE targets
       SET retry_count = retry_count + 1, last_attempt_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(target.id);
-    
-    // إرسال الرسالة
+      WHERE id = $1
+    `, [target.id]);
+
     const result = await sendDM(campaign.encrypted_cookies, target.username, message);
 
     if (result.success) {
-      // ✅ نجح الإرسال
       logMessage(campaignId);
       
-      // تحديث الهدف إلى sent
-      db.prepare(`
+      await query(`
         UPDATE targets
         SET status = 'sent', sent_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(target.id);
+        WHERE id = $1
+      `, [target.id]);
 
-      // تحديث إحصائيات الحملة
-      db.prepare(`
+      await query(`
         UPDATE campaigns
         SET stats_sent = stats_sent + 1
-        WHERE id = ?
-      `).run(campaignId);
+        WHERE id = $1
+      `, [campaignId]);
 
-      console.log(`✅ [Campaign ${campaignId}] ${isRetry ? 'Retry succeeded' : 'Sent'} to ${target.username} - waiting ${delay.toFixed(1)}s`);
-      
-      // ✅ تأخير عشوائي بعد الإرسال
-      await new Promise(resolve => setTimeout(resolve, delay * 1000));
-      
+      console.log(`✅ [Campaign ${campaignId}] Sent to ${target.username}`);
     } else {
-      // ✅ فشل الإرسال
-      const currentRetryCount = target.retry_count + 1;
-      
       if (currentRetryCount >= campaign.pacing_retry_attempts) {
-        // استنفدنا المحاولات - تحديث إلى failed نهائياً
-        db.prepare(`
+        await query(`
           UPDATE targets
-          SET status = 'failed', error_message = ?
-          WHERE id = ?
-        `).run(result.error || 'Unknown error', target.id);
+          SET status = 'failed', error_message = $1
+          WHERE id = $2
+        `, [result.error || 'Unknown error', target.id]);
 
-        // تحديث إحصائيات الحملة
-        db.prepare(`
+        await query(`
           UPDATE campaigns
           SET stats_failed = stats_failed + 1
-          WHERE id = ?
-        `).run(campaignId);
+          WHERE id = $1
+        `, [campaignId]);
 
-        console.log(`❌ [Campaign ${campaignId}] Failed permanently to ${target.username} after ${currentRetryCount} attempts: ${result.error}`);
+        console.log(`❌ [Campaign ${campaignId}] Failed permanently to ${target.username}`);
       } else {
-        // لا زالت هناك محاولات متبقية
-        db.prepare(`
+        await query(`
           UPDATE targets
-          SET error_message = ?
-          WHERE id = ?
-        `).run(result.error || 'Unknown error', target.id);
-        
-        console.log(`⚠️  [Campaign ${campaignId}] Failed attempt ${currentRetryCount}/${campaign.pacing_retry_attempts} to ${target.username}: ${result.error} - will retry`);
+          SET error_message = $1
+          WHERE id = $2
+        `, [result.error || 'Unknown error', target.id]);
+
+        console.log(`⚠️  [Campaign ${campaignId}] Failed to ${target.username}, will retry`);
       }
-      
-      // تأخير قصير بعد الفشل
-      await new Promise(resolve => setTimeout(resolve, 5000));
     }
 
+    const delay = campaign.pacing_delay_min + Math.random() * (campaign.pacing_delay_max - campaign.pacing_delay_min);
+    await new Promise(resolve => setTimeout(resolve, delay * 1000));
+
   } catch (error) {
-    console.error(`❌ Error processing campaign ${campaignId}:`, error);
+    console.error(`Error processing campaign ${campaignId}:`, error);
   } finally {
-    // ✅ إزالة الحملة من قائمة المعالجة
     processingCampaigns.delete(campaignId);
   }
 }
 
-// استئناف الحملات النشطة عند بدء التشغيل
-export function resumeActiveCampaigns() {
-  const campaigns = db.prepare(`
-    SELECT id FROM campaigns WHERE status = 'active'
-  `).all() as Array<{ id: number }>;
+export async function resumeActiveCampaigns() {
+  try {
+    const campaignsResult = await query(`
+      SELECT id FROM campaigns WHERE status = 'active'
+    `);
 
-  for (const campaign of campaigns) {
-    startCampaign(campaign.id);
+    for (const campaign of campaignsResult.rows) {
+      console.log(`Resume campaign ${campaign.id} - temporarily disabled`);
+      // await startCampaign(campaign.id);
+    }
+  } catch (error) {
+    console.error('Error resuming campaigns:', error);
   }
-
-  console.log(`Resumed ${campaigns.length} active campaigns`);
 }

@@ -6,10 +6,11 @@ interface FollowCampaignConfig {
   id: number;
   account_id: number;
   encrypted_cookies: string;
-  settings_follows_per_minute: number;
-  settings_daily_cap: number;
-  settings_random_delay: boolean;
-  settings_auto_pause: boolean;
+  pacing_per_minute: number;
+  pacing_daily_cap: number;
+  pacing_delay_min: number;
+  pacing_delay_max: number;
+  pacing_retry_attempts: number;
 }
 
 interface FollowLog {
@@ -21,14 +22,13 @@ const runningFollowCampaigns = new Map<number, NodeJS.Timeout>();
 const followLog = new Map<number, FollowLog[]>();
 const processingFollowCampaigns = new Set<number>();
 
-// بدء حملة متابعة
-export function startFollowCampaign(campaignId: number) {
+export async function startFollowCampaign(campaignId: number) {
   if (runningFollowCampaigns.has(campaignId)) {
     console.log(`Follow campaign ${campaignId} is already running`);
     return;
   }
 
-  db.prepare('UPDATE follow_campaigns SET status = ? WHERE id = ?').run('active', campaignId);
+  await query('UPDATE follow_campaigns SET status = $1 WHERE id = $2', ['active', campaignId]);
 
   if (!followLog.has(campaignId)) {
     followLog.set(campaignId, []);
@@ -42,51 +42,47 @@ export function startFollowCampaign(campaignId: number) {
   console.log(`✅ Follow campaign ${campaignId} started`);
 }
 
-// إيقاف حملة مؤقتاً
-export function pauseFollowCampaign(campaignId: number) {
+export async function pauseFollowCampaign(campaignId: number) {
   const interval = runningFollowCampaigns.get(campaignId);
   if (interval) {
     clearInterval(interval);
     runningFollowCampaigns.delete(campaignId);
   }
   
-  db.prepare('UPDATE follow_campaigns SET status = ? WHERE id = ?').run('paused', campaignId);
+  await query('UPDATE follow_campaigns SET status = $1 WHERE id = $2', ['paused', campaignId]);
   console.log(`⏸️  Follow campaign ${campaignId} paused`);
 }
 
-// إيقاف حملة نهائياً
-export function stopFollowCampaign(campaignId: number) {
+export async function stopFollowCampaign(campaignId: number) {
   const interval = runningFollowCampaigns.get(campaignId);
   if (interval) {
     clearInterval(interval);
     runningFollowCampaigns.delete(campaignId);
   }
   
+  processingFollowCampaigns.delete(campaignId);
   followLog.delete(campaignId);
   
-  db.prepare('UPDATE follow_campaigns SET status = ? WHERE id = ?').run('completed', campaignId);
+  await query('UPDATE follow_campaigns SET status = $1 WHERE id = $2', ['completed', campaignId]);
   console.log(`⏹️  Follow campaign ${campaignId} stopped`);
 }
 
-// حساب عدد المتابعات في الدقيقة الأخيرة
-function getFollowsInLastMinute(campaignId: number): number {
-  const logs = followLog.get(campaignId) || [];
-  const oneMinuteAgo = Date.now() - 60000;
-  
-  const recentLogs = logs.filter(log => log.timestamp > oneMinuteAgo);
-  followLog.set(campaignId, recentLogs);
-  
-  return recentLogs.length;
-}
-
-// تسجيل متابعة
 function logFollow(campaignId: number) {
   const logs = followLog.get(campaignId) || [];
   logs.push({ timestamp: Date.now(), campaignId });
   followLog.set(campaignId, logs);
+  
+  const oneMinuteAgo = Date.now() - 60000;
+  const recentLogs = logs.filter(log => log.timestamp > oneMinuteAgo);
+  followLog.set(campaignId, recentLogs);
 }
 
-// معالجة حملة متابعة
+function getFollowsInLastMinute(campaignId: number): number {
+  const logs = followLog.get(campaignId) || [];
+  const oneMinuteAgo = Date.now() - 60000;
+  return logs.filter(log => log.timestamp > oneMinuteAgo).length;
+}
+
 async function processFollowCampaign(campaignId: number) {
   if (processingFollowCampaigns.has(campaignId)) {
     return;
@@ -95,156 +91,132 @@ async function processFollowCampaign(campaignId: number) {
   processingFollowCampaigns.add(campaignId);
   
   try {
-    const campaign = db.prepare(`
+    const campaignResult = await query(`
       SELECT c.*, a.encrypted_cookies
       FROM follow_campaigns c
       JOIN accounts a ON c.account_id = a.id
-      WHERE c.id = ? AND c.status = 'active'
-    `).get(campaignId) as FollowCampaignConfig | undefined;
+      WHERE c.id = $1 AND c.status = 'active'
+    `, [campaignId]);
 
-    if (!campaign) {
-      pauseFollowCampaign(campaignId);
-      return;
-    }
-
-    // التحقق من معدل المتابعة في الدقيقة
-    const followsInLastMinute = getFollowsInLastMinute(campaignId);
-    if (followsInLastMinute >= campaign.settings_follows_per_minute) {
-      return;
-    }
-
-    // التحقق من الحد اليومي
-    const today = new Date().toISOString().split('T')[0];
-    const followsToday = db.prepare(`
-      SELECT COUNT(*) as count
-      FROM follow_targets
-      WHERE campaign_id = ? 
-        AND (status = 'followed' OR last_attempt_at IS NOT NULL)
-        AND DATE(COALESCE(last_attempt_at, CURRENT_TIMESTAMP)) = ?
-    `).get(campaignId, today) as { count: number };
-
-    if (followsToday.count >= campaign.settings_daily_cap) {
-      console.log(`⚠️  Follow campaign ${campaignId} reached daily cap (${campaign.settings_daily_cap})`);
-      
-      if (campaign.settings_auto_pause) {
-        pauseFollowCampaign(campaignId);
-      }
-      return;
-    }
-
-    // الحصول على الهدف التالي
-    const target = db.prepare(`
-      SELECT * FROM follow_targets
-      WHERE campaign_id = ? AND status = 'pending'
-      ORDER BY id ASC
-      LIMIT 1
-    `).get(campaignId) as any;
-
-    if (!target) {
-      console.log(`✅ Follow campaign ${campaignId} completed - no more targets`);
+    if (!campaignResult.rows[0]) {
       stopFollowCampaign(campaignId);
       return;
     }
 
-    // التحقق من عدم متابعة نفس المستخدم مرتين
-    const alreadyFollowed = db.prepare(`
-      SELECT COUNT(*) as count
-      FROM follow_targets
-      WHERE campaign_id = ? AND username = ? AND status = 'followed'
-    `).get(campaignId, target.username) as { count: number };
+    const campaign = campaignResult.rows[0] as FollowCampaignConfig;
+    const followsInLastMinute = getFollowsInLastMinute(campaignId);
 
-    if (alreadyFollowed.count > 0) {
-      db.prepare(`
-        UPDATE follow_targets
-        SET status = 'skipped', error_message = 'Already followed'
-        WHERE id = ?
-      `).run(target.id);
+    if (followsInLastMinute >= campaign.pacing_per_minute) {
+      processingFollowCampaigns.delete(campaignId);
       return;
     }
 
-    console.log(`👤 [Follow Campaign ${campaignId}] Following ${target.username} (${followsInLastMinute + 1}/${campaign.settings_follows_per_minute} per min, ${followsToday.count + 1}/${campaign.settings_daily_cap} today)`);
-    
-    // تحديث last_attempt_at
-    db.prepare(`
+    const today = new Date().toISOString().split('T')[0];
+    const attemptsTodayResult = await query(`
+      SELECT COUNT(*) as count
+      FROM follow_targets
+      WHERE campaign_id = $1 
+        AND DATE(last_attempt_at) = $2
+    `, [campaignId, today]);
+
+    const attemptsToday = attemptsTodayResult.rows[0];
+
+    if (attemptsToday.count >= campaign.pacing_daily_cap) {
+      console.log(`⏸️  Follow campaign ${campaignId} reached daily cap`);
+      processingFollowCampaigns.delete(campaignId);
+      return;
+    }
+
+    const targetResult = await query(`
+      SELECT * FROM follow_targets
+      WHERE campaign_id = $1 
+        AND status != 'followed'
+        AND (status = 'pending' OR (status = 'failed' AND retry_count < $2))
+      ORDER BY created_at ASC
+      LIMIT 1
+    `, [campaignId, campaign.pacing_retry_attempts]);
+
+    const target = targetResult.rows[0];
+
+    if (!target) {
+      console.log(`✅ Follow campaign ${campaignId} completed`);
+      stopFollowCampaign(campaignId);
+      return;
+    }
+
+    await query(`
       UPDATE follow_targets
-      SET last_attempt_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(target.id);
-    
-    // متابعة المستخدم
+      SET retry_count = retry_count + 1, last_attempt_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+    `, [target.id]);
+
     const result = await followUser(campaign.encrypted_cookies, target.username);
 
     if (result.success) {
       logFollow(campaignId);
       
-      db.prepare(`
+      await query(`
         UPDATE follow_targets
-        SET status = 'followed'
-        WHERE id = ?
-      `).run(target.id);
+        SET status = 'followed', followed_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+      `, [target.id]);
 
-      db.prepare(`
+      await query(`
         UPDATE follow_campaigns
-        SET stats_sent = stats_sent + 1
-        WHERE id = ?
-      `).run(campaignId);
+        SET stats_followed = stats_followed + 1
+        WHERE id = $1
+      `, [campaignId]);
 
       console.log(`✅ [Follow Campaign ${campaignId}] Followed ${target.username}`);
-      
-      // تأخير عشوائي إذا كان مفعلاً
-      if (campaign.settings_random_delay) {
-        const delay = 5000 + Math.random() * 10000; // 5-15 ثانية
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-      
     } else {
-      db.prepare(`
-        UPDATE follow_targets
-        SET status = 'failed', error_message = ?
-        WHERE id = ?
-      `).run(result.error || 'Unknown error', target.id);
-
-      db.prepare(`
-        UPDATE follow_campaigns
-        SET stats_failed = stats_failed + 1
-        WHERE id = ?
-      `).run(campaignId);
-
-      console.log(`❌ [Follow Campaign ${campaignId}] Failed to follow ${target.username}: ${result.error}`);
+      const currentRetryCount = target.retry_count || 0;
       
-      // التحقق من معدل الفشل
-      if (campaign.settings_auto_pause) {
-        const stats = db.prepare(`
-          SELECT stats_sent, stats_failed FROM follow_campaigns WHERE id = ?
-        `).get(campaignId) as any;
-        
-        const totalAttempts = stats.stats_sent + stats.stats_failed;
-        if (totalAttempts >= 10) {
-          const failureRate = stats.stats_failed / totalAttempts;
-          if (failureRate > 0.2) { // أكثر من 20% فشل
-            console.log(`⚠️  High failure rate detected (${(failureRate * 100).toFixed(1)}%) - pausing campaign`);
-            pauseFollowCampaign(campaignId);
-          }
-        }
+      if (currentRetryCount >= campaign.pacing_retry_attempts) {
+        await query(`
+          UPDATE follow_targets
+          SET status = 'failed', error_message = $1
+          WHERE id = $2
+        `, [result.error || 'Unknown error', target.id]);
+
+        await query(`
+          UPDATE follow_campaigns
+          SET stats_failed = stats_failed + 1
+          WHERE id = $1
+        `, [campaignId]);
+
+        console.log(`❌ [Follow Campaign ${campaignId}] Failed to follow ${target.username}`);
+      } else {
+        await query(`
+          UPDATE follow_targets
+          SET error_message = $1
+          WHERE id = $2
+        `, [result.error || 'Unknown error', target.id]);
+
+        console.log(`⚠️  [Follow Campaign ${campaignId}] Failed to follow ${target.username}, will retry`);
       }
     }
 
+    const delay = campaign.pacing_delay_min + Math.random() * (campaign.pacing_delay_max - campaign.pacing_delay_min);
+    await new Promise(resolve => setTimeout(resolve, delay * 1000));
+
   } catch (error) {
-    console.error(`❌ Error processing follow campaign ${campaignId}:`, error);
+    console.error(`Error processing follow campaign ${campaignId}:`, error);
   } finally {
     processingFollowCampaigns.delete(campaignId);
   }
 }
 
-// استئناف الحملات النشطة
-export function resumeActiveFollowCampaigns() {
-  const campaigns = db.prepare(`
-    SELECT id FROM follow_campaigns WHERE status = 'active'
-  `).all() as Array<{ id: number }>;
+export async function resumeActiveFollowCampaigns() {
+  try {
+    const campaignsResult = await query(`
+      SELECT id FROM follow_campaigns WHERE status = 'active'
+    `);
 
-  for (const campaign of campaigns) {
-    startFollowCampaign(campaign.id);
+    for (const campaign of campaignsResult.rows) {
+      console.log(`Resume follow campaign ${campaign.id} - temporarily disabled`);
+      // await startFollowCampaign(campaign.id);
+    }
+  } catch (error) {
+    console.error('Error resuming follow campaigns:', error);
   }
-
-  console.log(`Resumed ${campaigns.length} active follow campaigns`);
 }
