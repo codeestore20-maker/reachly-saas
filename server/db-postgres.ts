@@ -172,6 +172,17 @@ export async function initializeDatabase(): Promise<void> {
       );
     `);
 
+    // Migrate existing users table to add new columns if they don't exist
+    logger.info('🔄 Checking for missing user columns...');
+    try {
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(255)`);
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(255)`);
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT`);
+      logger.info('✅ User columns migration completed');
+    } catch (error) {
+      logger.warn('⚠️  User columns migration skipped (columns may already exist)');
+    }
+
     await query(`
       CREATE TABLE IF NOT EXISTS accounts (
         id SERIAL PRIMARY KEY,
