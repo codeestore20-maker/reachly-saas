@@ -1,2 +1,3 @@
-Force rebuild - 2025-10-17 01:38
-Admin role fix deployed
+Force rebuild - 2025-10-17 01:48
+Admin role fix deployed - CRITICAL UPDATE
+JWT token now includes role field
