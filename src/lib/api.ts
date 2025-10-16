@@ -73,6 +73,9 @@ export const campaigns = {
   create: (data: any) =>
     fetchAPI('/campaigns', { method: 'POST', body: JSON.stringify(data) }),
   
+  update: (id: number, data: any) =>
+    fetchAPI(`/campaigns/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  
   start: (id: number) =>
     fetchAPI(`/campaigns/${id}/start`, { method: 'POST' }),
   
@@ -103,6 +106,9 @@ export const followCampaigns = {
   create: (data: any) =>
     fetchAPI('/follow-campaigns', { method: 'POST', body: JSON.stringify(data) }),
   
+  update: (id: number, data: any) =>
+    fetchAPI(`/follow-campaigns/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  
   start: (id: number) =>
     fetchAPI(`/follow-campaigns/${id}/start`, { method: 'POST' }),
   
@@ -111,4 +117,15 @@ export const followCampaigns = {
   
   stop: (id: number) =>
     fetchAPI(`/follow-campaigns/${id}/stop`, { method: 'POST' }),
+};
+
+// User Settings
+export const userSettings = {
+  getProfile: () => fetchAPI('/user/profile'),
+  
+  updateProfile: (data: { firstName: string; lastName: string; email: string }) =>
+    fetchAPI('/user/profile', { method: 'PUT', body: JSON.stringify(data) }),
+  
+  updatePassword: (data: { currentPassword: string; newPassword: string }) =>
+    fetchAPI('/user/password', { method: 'PUT', body: JSON.stringify(data) }),
 };

@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import bcrypt from 'bcryptjs';
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -391,6 +392,59 @@ app.post('/api/campaigns/:id/stop', authMiddleware, (req: any, res) => {
   }
 });
 
+// Update campaign draft
+app.put('/api/campaigns/:id', authMiddleware, async (req: any, res) => {
+  try {
+    const { name, accountId, tags, targetSource, manualTargets, selectedFollowers, message, pacing } = req.body;
+    
+    const campaignCheck = await query('SELECT * FROM campaigns WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    if (!campaignCheck.rows[0]) return res.status(404).json({ error: 'Campaign not found' });
+    
+    const pacingSettings = {
+      perMinute: pacing?.perMinute || 3,
+      delayMin: pacing?.delayMin || 15,
+      delayMax: pacing?.delayMax || 30,
+      dailyCap: pacing?.dailyCap || 50,
+      retryAttempts: pacing?.retryAttempts || 2
+    };
+    
+    await query(`
+      UPDATE campaigns SET 
+        name = $1, account_id = $2, tags = $3, target_source = $4, message_template = $5,
+        pacing_per_minute = $6, pacing_delay_min = $7, pacing_delay_max = $8, 
+        pacing_daily_cap = $9, pacing_retry_attempts = $10
+      WHERE id = $11 AND user_id = $12
+    `, [name, accountId, tags ? JSON.stringify(tags) : null, targetSource, message,
+        pacingSettings.perMinute, pacingSettings.delayMin, pacingSettings.delayMax,
+        pacingSettings.dailyCap, pacingSettings.retryAttempts, req.params.id, req.user.id]);
+    
+    // Update targets if provided
+    if (targetSource === 'manual' && manualTargets) {
+      await query('DELETE FROM targets WHERE campaign_id = $1', [req.params.id]);
+      const usernames = manualTargets.split(/[\n,]/).map((u: string) => u.trim().replace('@', '')).filter(Boolean);
+      for (const username of usernames) {
+        await query(`INSERT INTO targets (campaign_id, user_id, username, name) VALUES ($1, $2, $3, $4)`,
+          [req.params.id, username, username, username]);
+      }
+      await query('UPDATE campaigns SET stats_total = $1 WHERE id = $2', [usernames.length, req.params.id]);
+    } else if (targetSource === 'followers' && selectedFollowers) {
+      await query('DELETE FROM targets WHERE campaign_id = $1', [req.params.id]);
+      for (const target of selectedFollowers) {
+        await query(`INSERT INTO targets (campaign_id, user_id, username, name, avatar) VALUES ($1, $2, $3, $4, $5)`,
+          [req.params.id, target.id || target.username, target.username, target.name || target.username, target.avatar || null]);
+      }
+      await query('UPDATE campaigns SET stats_total = $1 WHERE id = $2', [selectedFollowers.length, req.params.id]);
+    }
+    
+    const updatedCampaign = await query('SELECT * FROM campaigns WHERE id = $1', [req.params.id]);
+    logger.info('Campaign draft updated', { campaignId: req.params.id });
+    res.json(updatedCampaign.rows[0]);
+  } catch (error) {
+    logger.error('Update campaign error', { error });
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 // ============ Follow Campaigns Routes ============
 
 app.get('/api/follow-campaigns', authMiddleware, async (req: any, res) => {
@@ -510,6 +564,59 @@ app.post('/api/follow-campaigns/:id/stop', authMiddleware, (req: any, res) => {
   }
 });
 
+// Update follow campaign draft
+app.put('/api/follow-campaigns/:id', authMiddleware, async (req: any, res) => {
+  try {
+    const { name, accountId, targetSource, manualTargets, selectedFollowers, pacing } = req.body;
+    
+    const campaignCheck = await query('SELECT * FROM follow_campaigns WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    if (!campaignCheck.rows[0]) return res.status(404).json({ error: 'Follow campaign not found' });
+    
+    const pacingSettings = {
+      perMinute: pacing?.perMinute || 3,
+      delayMin: pacing?.delayMin || 15,
+      delayMax: pacing?.delayMax || 30,
+      dailyCap: pacing?.dailyCap || 50,
+      retryAttempts: pacing?.retryAttempts || 2
+    };
+    
+    await query(`
+      UPDATE follow_campaigns SET 
+        name = $1, account_id = $2, target_source = $3,
+        pacing_per_minute = $4, pacing_delay_min = $5, pacing_delay_max = $6, 
+        pacing_daily_cap = $7, pacing_retry_attempts = $8
+      WHERE id = $9 AND user_id = $10
+    `, [name, accountId, targetSource,
+        pacingSettings.perMinute, pacingSettings.delayMin, pacingSettings.delayMax,
+        pacingSettings.dailyCap, pacingSettings.retryAttempts, req.params.id, req.user.id]);
+    
+    // Update targets if provided
+    if (targetSource === 'manual' && manualTargets) {
+      await query('DELETE FROM follow_targets WHERE campaign_id = $1', [req.params.id]);
+      const usernames = manualTargets.split(/[\n,]/).map((u: string) => u.trim().replace('@', '')).filter(Boolean);
+      for (const username of usernames) {
+        await query(`INSERT INTO follow_targets (campaign_id, username, name, handle) VALUES ($1, $2, $3, $4)`,
+          [req.params.id, username, username, '@' + username]);
+      }
+      await query('UPDATE follow_campaigns SET stats_total = $1 WHERE id = $2', [usernames.length, req.params.id]);
+    } else if (targetSource === 'followers' && selectedFollowers) {
+      await query('DELETE FROM follow_targets WHERE campaign_id = $1', [req.params.id]);
+      for (const target of selectedFollowers) {
+        await query(`INSERT INTO follow_targets (campaign_id, username, name, handle, avatar) VALUES ($1, $2, $3, $4, $5)`,
+          [req.params.id, target.username, target.name || target.username, target.handle || '@' + target.username, target.avatar || null]);
+      }
+      await query('UPDATE follow_campaigns SET stats_total = $1 WHERE id = $2', [selectedFollowers.length, req.params.id]);
+    }
+    
+    const updatedCampaign = await query('SELECT * FROM follow_campaigns WHERE id = $1', [req.params.id]);
+    logger.info('Follow campaign draft updated', { campaignId: req.params.id });
+    res.json(updatedCampaign.rows[0]);
+  } catch (error) {
+    logger.error('Update follow campaign error', { error });
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 // ============ Dashboard Stats ============
 
 app.get('/api/dashboard/stats', authMiddleware, async (req: any, res) => {
@@ -531,6 +638,75 @@ app.get('/api/dashboard/stats', authMiddleware, async (req: any, res) => {
     });
   } catch (error) {
     logger.error('Get dashboard stats error', { error });
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// ============ User Settings Routes ============
+
+// Get user profile
+app.get('/api/user/profile', authMiddleware, async (req: any, res) => {
+  try {
+    const result = await query('SELECT id, email, first_name, last_name, avatar, created_at FROM users WHERE id = $1', [req.user.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'User not found' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    logger.error('Get user profile error', { error });
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Update user profile
+app.put('/api/user/profile', authMiddleware, async (req: any, res) => {
+  try {
+    const { firstName, lastName, email } = req.body;
+    
+    await query(`
+      UPDATE users SET 
+        first_name = $1, 
+        last_name = $2, 
+        email = $3
+      WHERE id = $4
+    `, [firstName, lastName, email, req.user.id]);
+    
+    const updatedUser = await query('SELECT id, email, first_name, last_name, avatar, created_at FROM users WHERE id = $1', [req.user.id]);
+    logger.info('User profile updated', { userId: req.user.id });
+    res.json(updatedUser.rows[0]);
+  } catch (error) {
+    logger.error('Update user profile error', { error });
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Update password
+app.put('/api/user/password', authMiddleware, async (req: any, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+    
+    // Get current user
+    const userResult = await query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+    const user = userResult.rows[0];
+    
+    // Verify current password
+    const isValid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+    
+    // Hash new password
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    
+    // Update password
+    await query('UPDATE users SET password_hash = $1 WHERE id = $2', [newPasswordHash, req.user.id]);
+    
+    logger.info('User password updated', { userId: req.user.id });
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    logger.error('Update password error', { error });
     res.status(500).json({ error: (error as Error).message });
   }
 });

@@ -6,13 +6,70 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LogOut, Save } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { clearAuthToken } from '@/lib/api';
+import { clearAuthToken, userSettings } from '@/lib/api';
+import { useEffect, useState } from 'react';
 
 export default function Settings() {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [profile, setProfile] = useState({ firstName: '', lastName: '', email: '' });
+  const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
-  const handleSave = () => {
-    toast.success('Settings saved successfully!');
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      const data = await userSettings.getProfile();
+      setProfile({
+        firstName: data.first_name || '',
+        lastName: data.last_name || '',
+        email: data.email || ''
+      });
+    } catch (error) {
+      console.error('Error loading profile:', error);
+      toast.error('Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    setSaving(true);
+    try {
+      await userSettings.updateProfile(profile);
+      toast.success('Profile updated successfully!');
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    if (passwords.newPassword !== passwords.confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    if (passwords.newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    setSaving(true);
+    try {
+      await userSettings.updatePassword({
+        currentPassword: passwords.currentPassword,
+        newPassword: passwords.newPassword
+      });
+      toast.success('Password updated successfully!');
+      setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error) {
+      toast.error((error as Error).message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleLogout = () => {
@@ -22,6 +79,10 @@ export default function Settings() {
     toast.success('Logged out successfully');
     navigate('/');
   };
+
+  if (loading) {
+    return <div className="min-h-screen bg-background p-8"><div className="text-center">Loading...</div></div>;
+  }
 
   return (
     <div className="min-h-screen bg-background p-8">
@@ -48,22 +109,35 @@ export default function Settings() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First Name</Label>
-                <Input id="firstName" defaultValue="Demo" />
+                <Input 
+                  id="firstName" 
+                  value={profile.firstName}
+                  onChange={(e) => setProfile({...profile, firstName: e.target.value})}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastName">Last Name</Label>
-                <Input id="lastName" defaultValue="User" />
+                <Input 
+                  id="lastName" 
+                  value={profile.lastName}
+                  onChange={(e) => setProfile({...profile, lastName: e.target.value})}
+                />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" defaultValue="demo@reachly.com" />
+              <Input 
+                id="email" 
+                type="email" 
+                value={profile.email}
+                onChange={(e) => setProfile({...profile, email: e.target.value})}
+              />
             </div>
 
-            <Button onClick={handleSave} className="bg-gradient-primary">
+            <Button onClick={handleSaveProfile} disabled={saving} className="bg-gradient-primary">
               <Save className="mr-2 h-4 w-4" />
-              Save Changes
+              {saving ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>
         </Card>
@@ -73,18 +147,33 @@ export default function Settings() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="currentPassword">Current Password</Label>
-              <Input id="currentPassword" type="password" />
+              <Input 
+                id="currentPassword" 
+                type="password"
+                value={passwords.currentPassword}
+                onChange={(e) => setPasswords({...passwords, currentPassword: e.target.value})}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="newPassword">New Password</Label>
-              <Input id="newPassword" type="password" />
+              <Input 
+                id="newPassword" 
+                type="password"
+                value={passwords.newPassword}
+                onChange={(e) => setPasswords({...passwords, newPassword: e.target.value})}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm New Password</Label>
-              <Input id="confirmPassword" type="password" />
+              <Input 
+                id="confirmPassword" 
+                type="password"
+                value={passwords.confirmPassword}
+                onChange={(e) => setPasswords({...passwords, confirmPassword: e.target.value})}
+              />
             </div>
-            <Button onClick={handleSave} variant="outline">
-              Update Password
+            <Button onClick={handleUpdatePassword} disabled={saving} variant="outline">
+              {saving ? 'Updating...' : 'Update Password'}
             </Button>
           </div>
         </Card>

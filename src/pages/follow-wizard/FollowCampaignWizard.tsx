@@ -68,9 +68,31 @@ export default function FollowCampaignWizard() {
     }
   };
 
-  const handleSaveDraft = () => {
-    localStorage.setItem('follow_campaign_draft', JSON.stringify(draft));
-    toast.success('Draft saved successfully!');
+  const handleSaveDraft = async () => {
+    try {
+      const { followCampaigns } = await import('@/lib/api');
+      const draftData = {
+        name: draft.name || 'Untitled Follow Campaign',
+        accountId: draft.accountId,
+        targetSource: draft.targetSource,
+        manualTargets: draft.manualTargets,
+        selectedFollowers: draft.selectedFollowers,
+        pacing: {
+          perMinute: draft.settings.followsPerMinute,
+          delayMin: 15,
+          delayMax: 30,
+          dailyCap: draft.settings.dailyCap,
+          retryAttempts: 2
+        }
+      };
+      
+      await followCampaigns.create(draftData);
+      toast.success('Draft saved successfully!');
+      localStorage.removeItem('follow_campaign_draft');
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      toast.error('Failed to save draft');
+    }
   };
 
   const progress = (currentStep / 4) * 100;

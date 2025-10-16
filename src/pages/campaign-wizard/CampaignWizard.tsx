@@ -76,9 +76,27 @@ export default function CampaignWizard() {
     }
   };
 
-  const handleSaveDraft = () => {
-    localStorage.setItem('campaign_draft', JSON.stringify(draft));
-    toast.success('Draft saved successfully!');
+  const handleSaveDraft = async () => {
+    try {
+      const { campaigns } = await import('@/lib/api');
+      const draftData = {
+        name: draft.name || 'Untitled Campaign',
+        accountId: draft.accountId,
+        tags: draft.tags,
+        targetSource: draft.targetSource,
+        manualTargets: draft.manualTargets,
+        selectedFollowers: draft.selectedFollowers,
+        message: draft.message || 'Draft message',
+        pacing: draft.pacing
+      };
+      
+      await campaigns.create(draftData);
+      toast.success('Draft saved successfully!');
+      localStorage.removeItem('campaign_draft');
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      toast.error('Failed to save draft');
+    }
   };
 
   const progress = (currentStep / 5) * 100;
