@@ -158,7 +158,7 @@ async function processFollowCampaign(campaignId: number) {
       
       await query(`
         UPDATE follow_targets
-        SET status = 'followed', followed_at = CURRENT_TIMESTAMP
+        SET status = 'followed', followed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
         WHERE id = $1
       `, [target.id]);
 
@@ -181,7 +181,7 @@ async function processFollowCampaign(campaignId: number) {
       if (currentRetryCount >= campaign.pacing_retry_attempts) {
         await query(`
           UPDATE follow_targets
-          SET status = 'failed', error_message = $1
+          SET status = 'failed', error_message = $1, updated_at = CURRENT_TIMESTAMP
           WHERE id = $2
         `, [result.error || 'Unknown error', target.id]);
 

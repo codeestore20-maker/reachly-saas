@@ -311,7 +311,7 @@ app.get('/api/campaigns/:id', authMiddleware, async (req: any, res) => {
     
     if (!campaignResult.rows[0]) return res.status(404).json({ error: 'Campaign not found' });
     
-    const targetsResult = await query('SELECT * FROM targets WHERE campaign_id = $1', [req.params.id]);
+    const targetsResult = await query('SELECT * FROM targets WHERE campaign_id = $1 ORDER BY updated_at DESC NULLS LAST, created_at ASC', [req.params.id]);
     res.json({ ...campaignResult.rows[0], targets: targetsResult.rows });
   } catch (error) {
     logger.error('Get campaign error', { error });
@@ -487,7 +487,7 @@ app.get('/api/follow-campaigns/:id', authMiddleware, async (req: any, res) => {
     
     if (!campaignResult.rows[0]) return res.status(404).json({ error: 'Follow campaign not found' });
     
-    const targetsResult = await query('SELECT * FROM follow_targets WHERE campaign_id = $1', [req.params.id]);
+    const targetsResult = await query('SELECT * FROM follow_targets WHERE campaign_id = $1 ORDER BY updated_at DESC NULLS LAST, created_at ASC', [req.params.id]);
     res.json({ ...campaignResult.rows[0], targets: targetsResult.rows });
   } catch (error) {
     logger.error('Get follow campaign error', { error });

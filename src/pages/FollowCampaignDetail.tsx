@@ -256,10 +256,11 @@ export default function FollowCampaignDetail() {
         </Card>
 
         <Card>
-          <div className="border-b border-border p-6">
-            <h2 className="text-xl font-semibold text-foreground">Target List</h2>
+          <div className="border-b border-border p-4">
+            <h2 className="text-lg font-semibold text-foreground">Target List ({campaign.targets.length})</h2>
           </div>
-          <Table>
+          <div className="max-h-[500px] overflow-y-auto">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>User</TableHead>
@@ -301,6 +302,7 @@ export default function FollowCampaignDetail() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </Card>
       </div>
     </div>

@@ -188,7 +188,7 @@ async function processCampaign(campaignId: number) {
       
       await query(`
         UPDATE targets
-        SET status = 'sent', sent_at = CURRENT_TIMESTAMP
+        SET status = 'sent', sent_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
         WHERE id = $1
       `, [target.id]);
 
@@ -209,7 +209,7 @@ async function processCampaign(campaignId: number) {
       if (currentRetryCount >= campaign.pacing_retry_attempts) {
         await query(`
           UPDATE targets
-          SET status = 'failed', error_message = $1
+          SET status = 'failed', error_message = $1, updated_at = CURRENT_TIMESTAMP
           WHERE id = $2
         `, [result.error || 'Unknown error', target.id]);
 
