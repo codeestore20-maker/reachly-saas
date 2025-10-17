@@ -321,7 +321,7 @@ app.get('/api/campaigns/:id', authMiddleware, async (req: any, res) => {
 
 app.post('/api/campaigns', authMiddleware, checkLimit('create_dm_campaign'), async (req: any, res) => {
   try {
-    const { name, accountId, tags, targetSource, manualTargets, selectedFollowers, message, pacing } = req.body;
+    const { name, accountId, tags, targetSource, manualTargets, selectedFollowers, message, pacing, isDraft } = req.body;
     if (!name || !accountId || !message) return res.status(400).json({ error: 'Missing required fields' });
     
     // Default pacing values if not provided
@@ -333,11 +333,14 @@ app.post('/api/campaigns', authMiddleware, checkLimit('create_dm_campaign'), asy
       retryAttempts: pacing?.retryAttempts || 2
     };
     
+    // Set status based on isDraft flag
+    const status = isDraft ? 'draft' : 'pending';
+    
     const result = await query(`
       INSERT INTO campaigns (user_id, account_id, name, status, target_source, message_template, tags,
         pacing_per_minute, pacing_delay_min, pacing_delay_max, pacing_daily_cap, pacing_retry_attempts)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id
-    `, [req.user.id, accountId, name, 'draft', targetSource, message, tags ? JSON.stringify(tags) : null,
+    `, [req.user.id, accountId, name, status, targetSource, message, tags ? JSON.stringify(tags) : null,
         pacingSettings.perMinute, pacingSettings.delayMin, pacingSettings.delayMax, 
         pacingSettings.dailyCap, pacingSettings.retryAttempts]);
     

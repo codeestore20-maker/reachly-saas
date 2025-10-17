@@ -124,7 +124,8 @@ export default function FollowCampaignWizard() {
           delayMax: 30,
           dailyCap: draft.settings.dailyCap,
           retryAttempts: 2
-        }
+        },
+        isDraft: true // Save as draft
       };
       
       let savedCampaign;

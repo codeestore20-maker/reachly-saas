@@ -27,7 +27,8 @@ export const StepReview = ({ draft, onBack }: Props) => {
         targetSource: draft.targetSource,
         manualTargets: draft.manualTargets,
         selectedFollowers: draft.selectedFollowers,
-        settings: draft.settings
+        settings: draft.settings,
+        isDraft: false // Create as pending, not draft
       });
       
       setShowSuccess(true);
