@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, Play, Pause, StopCircle, UserPlus, Edit } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { CampaignsSkeleton } from '@/components/loading/PageSkeleton';
 
 export default function FollowCampaigns() {
   const navigate = useNavigate();
@@ -79,7 +80,7 @@ export default function FollowCampaigns() {
   };
   
   if (loading) {
-    return <div className="min-h-screen bg-background p-8"><div className="text-center">Loading...</div></div>;
+    return <CampaignsSkeleton />;
   }
 
   return (

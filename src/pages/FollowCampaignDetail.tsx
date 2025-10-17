@@ -1,9 +1,11 @@
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Download, Play, Pause, StopCircle, UserPlus, Edit } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { ArrowLeft, Play, Pause, StopCircle, Users, UserCheck, UserX, Clock } from 'lucide-react';
+import { DetailSkeleton } from '@/components/loading/PageSkeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
@@ -108,7 +110,7 @@ export default function FollowCampaignDetail() {
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-background p-8"><div className="text-center">Loading...</div></div>;
+    return <DetailSkeleton />;
   }
 
   if (!campaign) {

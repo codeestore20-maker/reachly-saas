@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, Sparkles } from 'lucide-react';
 import { subscription } from '@/lib/api';
+import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function Plans() {
   const [plans, setPlans] = useState<any[]>([]);
@@ -30,7 +32,28 @@ export default function Plans() {
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-background p-8"><div className="text-center">Loading...</div></div>;
+    return (
+      <div className="min-h-screen bg-background p-8">
+        <div className="mx-auto max-w-7xl space-y-6">
+          <Skeleton className="h-12 w-64 mx-auto" />
+          <Skeleton className="h-6 w-96 mx-auto" />
+          <div className="grid gap-6 md:grid-cols-3 mt-12">
+            {[...Array(3)].map((_, i) => (
+              <Card key={i} className="p-8">
+                <Skeleton className="h-8 w-32 mb-4" />
+                <Skeleton className="h-16 w-full mb-6" />
+                <div className="space-y-3">
+                  {[...Array(6)].map((_, j) => (
+                    <Skeleton key={j} className="h-6 w-full" />
+                  ))}
+                </div>
+                <Skeleton className="h-12 w-full mt-8" />
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -49,7 +49,7 @@ export default function Dashboard() {
   ];
   
   if (loading) {
-    return <div className="min-h-screen bg-background p-8"><div className="text-center">Loading...</div></div>;
+    return <DashboardSkeleton />;
   }
 
   return (
