@@ -355,8 +355,9 @@ app.post('/api/campaigns', authMiddleware, checkLimit('create_dm_campaign'), asy
     }
     
     if (targets.length > 0) {
-      for (const target of targets) {
-        await query(`INSERT INTO targets (campaign_id, user_id, username, name, avatar) VALUES ($1, $2, $3, $4, $5)`,
+      for (let i = 0; i < targets.length; i++) {
+        const target = targets[i];
+        await query(`INSERT INTO targets (campaign_id, user_id, username, name, avatar, created_at) VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '${i} milliseconds')`,
           [campaignId, target.id || target.username, target.username, target.name || target.username, target.avatar || null]);
       }
       await query('UPDATE campaigns SET stats_total = $1 WHERE id = $2', [targets.length, campaignId]);
@@ -530,8 +531,9 @@ app.post('/api/follow-campaigns', authMiddleware, checkLimit('create_follow_camp
     }
     
     if (targets.length > 0) {
-      for (const target of targets) {
-        await query(`INSERT INTO follow_targets (campaign_id, user_id, username, name, avatar) VALUES ($1, $2, $3, $4, $5)`,
+      for (let i = 0; i < targets.length; i++) {
+        const target = targets[i];
+        await query(`INSERT INTO follow_targets (campaign_id, user_id, username, name, avatar, created_at) VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '${i} milliseconds')`,
           [campaignId, target.id || target.username, target.username, target.name || target.username, target.avatar || null]);
       }
       await query('UPDATE follow_campaigns SET stats_total = $1 WHERE id = $2', [targets.length, campaignId]);
