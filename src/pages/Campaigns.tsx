@@ -85,10 +85,7 @@ export default function Campaigns() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Campaigns</h1>
-            <p className="text-muted-foreground">
-              Manage your outreach campaigns
-              <span className="ml-2 text-xs opacity-50">• Auto-refreshing every 5s</span>
-            </p>
+            <p className="text-muted-foreground">Manage your outreach campaigns</p>
           </div>
           <Button onClick={() => navigate('/campaigns/new')} className="bg-gradient-primary">
             <Plus className="mr-2 h-4 w-4" />
@@ -118,35 +115,16 @@ export default function Campaigns() {
         </div>
 
         <div className="grid gap-4">
-          {filteredCampaigns.length === 0 ? (
-            <Card className="p-12 text-center">
-              <Send className="mx-auto h-16 w-16 text-muted-foreground opacity-50" />
-              <h3 className="mt-4 text-lg font-semibold text-foreground">
-                {search || filter !== 'all' ? 'No campaigns found' : 'No campaigns yet'}
-              </h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {search || filter !== 'all' 
-                  ? 'Try adjusting your search or filters' 
-                  : 'Create your first campaign to get started'}
-              </p>
-              {!search && filter === 'all' && (
-                <Button className="mt-4 bg-gradient-primary" onClick={() => navigate('/campaigns/new')}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Campaign
-                </Button>
-              )}
-            </Card>
-          ) : (
-            filteredCampaigns.map((campaign) => (
-              <Card
-                key={campaign.id}
-                className="cursor-pointer p-4 shadow-md transition-all hover:shadow-lg"
-                onClick={() => navigate(`/campaigns/${campaign.id}`)}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-semibold text-foreground">{campaign.name}</h3>
+          {filteredCampaigns.map((campaign) => (
+            <Card
+              key={campaign.id}
+              className="cursor-pointer p-6 shadow-md transition-all hover:shadow-lg"
+              onClick={() => navigate(`/campaigns/${campaign.id}`)}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-xl font-semibold text-foreground">{campaign.name}</h3>
                     <Badge variant={
                       campaign.status === 'active' ? 'default' :
                       campaign.status === 'paused' ? 'secondary' :
@@ -156,8 +134,7 @@ export default function Campaigns() {
                     </Badge>
                     {campaign.tags && JSON.parse(campaign.tags).map((tag: string) => (
                       <Badge key={tag} variant="outline">{tag}</Badge>
-                    ))
-          )}
+                    ))}
                   </div>
 
                   <div className="flex items-center gap-6 text-sm text-muted-foreground">
@@ -165,21 +142,21 @@ export default function Campaigns() {
                     <span>Created: {new Date(campaign.created_at).toLocaleDateString()}</span>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-4 gap-4">
                     <div>
-                      <p className="text-xl font-bold text-foreground">{campaign.stats_total}</p>
-                      <p className="text-xs text-muted-foreground">Total</p>
+                      <p className="text-2xl font-bold text-foreground">{campaign.stats_total}</p>
+                      <p className="text-xs text-muted-foreground">Total Targets</p>
                     </div>
                     <div>
-                      <p className="text-xl font-bold text-primary">{campaign.stats_sent}</p>
+                      <p className="text-2xl font-bold text-primary">{campaign.stats_sent}</p>
                       <p className="text-xs text-muted-foreground">Sent</p>
                     </div>
                     <div>
-                      <p className="text-xl font-bold text-success">{campaign.stats_replied}</p>
+                      <p className="text-2xl font-bold text-success">{campaign.stats_replied}</p>
                       <p className="text-xs text-muted-foreground">Replied</p>
                     </div>
                     <div>
-                      <p className="text-xl font-bold text-destructive">{campaign.stats_failed}</p>
+                      <p className="text-2xl font-bold text-destructive">{campaign.stats_failed}</p>
                       <p className="text-xs text-muted-foreground">Failed</p>
                     </div>
                   </div>
@@ -187,13 +164,13 @@ export default function Campaigns() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Progress</span>
-                      <span className="font-semibold text-foreground">
+                      <span className="font-medium text-foreground">
                         {campaign.stats_total > 0 ? ((campaign.stats_sent / campaign.stats_total) * 100).toFixed(0) : 0}%
                       </span>
                     </div>
-                    <div className="h-3 overflow-hidden rounded-full bg-muted">
+                    <div className="h-2 overflow-hidden rounded-full bg-muted">
                       <div
-                        className="h-full bg-gradient-primary transition-all duration-500"
+                        className="h-full bg-gradient-primary transition-all"
                         style={{ width: `${campaign.stats_total > 0 ? (campaign.stats_sent / campaign.stats_total) * 100 : 0}%` }}
                       />
                     </div>
