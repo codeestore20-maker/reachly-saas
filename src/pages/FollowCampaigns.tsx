@@ -121,89 +121,93 @@ export default function FollowCampaigns() {
           </Tabs>
         </div>
 
-        <div className="grid gap-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredCampaigns.length === 0 ? (
-            <Card className="p-12 text-center">
-              <UserPlus className="mx-auto h-16 w-16 text-muted-foreground opacity-50" />
-              <h3 className="mt-4 text-lg font-semibold text-foreground">
+            <Card className="p-12 text-center md:col-span-2 lg:col-span-3">
+              <div className="mx-auto w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <UserPlus className="h-12 w-12 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">
                 {search || filter !== 'all' ? 'No campaigns found' : 'No follow campaigns yet'}
               </h3>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
                 {search || filter !== 'all' 
                   ? 'Try adjusting your search or filters' 
-                  : 'Create your first follow campaign to get started'}
+                  : 'Start your first follow campaign and grow your network automatically'}
               </p>
               {!search && filter === 'all' && (
-                <Button className="mt-4 bg-gradient-primary" onClick={() => navigate('/follow-campaigns/new')}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Follow Campaign
-                </Button>
+                <div className="flex gap-3 justify-center">
+                  <Button className="bg-gradient-primary" onClick={() => navigate('/follow-campaigns/new')}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Follow Campaign
+                  </Button>
+                </div>
               )}
             </Card>
           ) : (
             filteredCampaigns.map((campaign) => (
             <Card
               key={campaign.id}
-              className="cursor-pointer p-6 shadow-md transition-all hover:shadow-lg"
+              className="cursor-pointer p-4 shadow-md transition-all hover:shadow-lg flex flex-col"
               onClick={() => navigate(`/follow-campaigns/${campaign.id}`)}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex-1 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <UserPlus className="h-5 w-5 text-primary" />
-                    <h3 className="text-xl font-semibold text-foreground">{campaign.name}</h3>
-                    <Badge variant={
+              <div className="space-y-3 flex-1">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <UserPlus className="h-4 w-4 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <h3 className="text-base font-semibold text-foreground truncate">{campaign.name}</h3>
+                      <p className="text-xs text-muted-foreground mt-1">@{campaign.account_username}</p>
+                    </div>
+                  </div>
+                  <Badge 
+                    variant={
                       campaign.status === 'active' ? 'default' :
                       campaign.status === 'paused' ? 'secondary' :
                       'outline'
-                    }>
-                      {campaign.status}
-                    </Badge>
-                  </div>
-
-                  <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={campaign.account_avatar} />
-                        <AvatarFallback>{campaign.account_username[0]}</AvatarFallback>
-                      </Avatar>
-                      <span>Account: {campaign.account_username}</span>
-                    </div>
-                    <span>Created: {new Date(campaign.created_at).toLocaleDateString()}</span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <p className="text-2xl font-bold text-foreground">{campaign.stats_total}</p>
-                      <p className="text-xs text-muted-foreground">Total Targets</p>
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-primary">{campaign.stats_followed || 0}</p>
-                      <p className="text-xs text-muted-foreground">Followed</p>
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-destructive">{campaign.stats_failed}</p>
-                      <p className="text-xs text-muted-foreground">Failed</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Progress</span>
-                      <span className="font-medium text-foreground">
-                        {campaign.stats_total > 0 ? (((campaign.stats_followed || 0) / campaign.stats_total) * 100).toFixed(0) : 0}%
-                      </span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full bg-gradient-primary transition-all"
-                        style={{ width: `${campaign.stats_total > 0 ? ((campaign.stats_followed || 0) / campaign.stats_total) * 100 : 0}%` }}
-                      />
-                    </div>
-                  </div>
+                    }
+                    className="shrink-0"
+                  >
+                    {campaign.status}
+                  </Badge>
                 </div>
 
-                <div className="flex gap-2 ml-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="text-center p-2 rounded-lg bg-muted/50">
+                    <p className="text-lg font-bold text-foreground">{campaign.stats_total}</p>
+                    <p className="text-xs text-muted-foreground">Total</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-primary/10">
+                    <p className="text-lg font-bold text-primary">{campaign.stats_followed || 0}</p>
+                    <p className="text-xs text-muted-foreground">Followed</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-success/10">
+                    <p className="text-lg font-bold text-success">{campaign.stats_followed || 0}</p>
+                    <p className="text-xs text-muted-foreground">Success</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-destructive/10">
+                    <p className="text-lg font-bold text-destructive">{campaign.stats_failed}</p>
+                    <p className="text-xs text-muted-foreground">Failed</p>
+                  </div>
+                  </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Progress</span>
+                    <span className="font-semibold text-foreground">
+                      {campaign.stats_total > 0 ? (((campaign.stats_followed || 0) / campaign.stats_total) * 100).toFixed(0) : 0}%
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full bg-gradient-primary transition-all duration-500"
+                      style={{ width: `${campaign.stats_total > 0 ? ((campaign.stats_followed || 0) / campaign.stats_total) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-3 pt-3 border-t border-border">
                   {campaign.status === 'draft' ? (
                     <Button 
                       size="sm" 
@@ -220,8 +224,7 @@ export default function FollowCampaigns() {
                       }}
                       title="Continue editing draft"
                     >
-                      <Edit className="h-3 w-3 mr-1" />
-                      Continue Setup
+                      <Edit className="h-3 w-3" />
                     </Button>
                   ) : (
                     <>
@@ -232,8 +235,7 @@ export default function FollowCampaigns() {
                           onClick={(e) => handleStart(campaign.id, e)}
                           title="Start campaign"
                         >
-                          <Play className="h-3 w-3 mr-1" />
-                          Start
+                          <Play className="h-3 w-3" />
                         </Button>
                       )}
                       {campaign.status === 'active' && (
@@ -243,8 +245,7 @@ export default function FollowCampaigns() {
                           onClick={(e) => handlePause(campaign.id, e)}
                           title="Pause campaign"
                         >
-                          <Pause className="h-3 w-3 mr-1" />
-                          Pause
+                          <Pause className="h-3 w-3" />
                         </Button>
                       )}
                       {campaign.status !== 'completed' && (
@@ -254,13 +255,11 @@ export default function FollowCampaigns() {
                           onClick={(e) => handleStop(campaign.id, e)}
                           title="Stop campaign"
                         >
-                          <StopCircle className="h-3 w-3 mr-1" />
-                          Stop
+                          <StopCircle className="h-3 w-3" />
                         </Button>
                       )}
                     </>
                   )}
-                </div>
               </div>
             </Card>
           ))

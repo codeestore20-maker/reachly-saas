@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save, Check } from 'lucide-react';
 import { StepBasics } from './StepBasics';
 import { StepTargets } from './StepTargets';
 import { StepSettings } from './StepSettings';
@@ -155,11 +155,19 @@ export default function FollowCampaignWizard() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-foreground">Create Follow Campaign</h1>
-            <p className="text-muted-foreground">Set up your automated follow campaign in 4 easy steps</p>
+            <h1 className="text-2xl font-bold text-foreground">
+              Create Follow Campaign - Step {currentStep}: {steps[currentStep - 1].name}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {currentStep === 1 && 'Set up basic campaign information'}
+              {currentStep === 2 && 'Choose your target audience'}
+              {currentStep === 3 && 'Configure pacing and limits'}
+              {currentStep === 4 && 'Review and launch'}
+              <span className="ml-2 text-xs opacity-50">• Tip: Press Ctrl+S to save draft</span>
+            </p>
           </div>
-          <Button variant="outline" onClick={handleSaveDraft}>
-            <Save className="mr-2 h-4 w-4" />
+          <Button variant="outline" onClick={handleSaveDraft} className="gap-2">
+            <Save className="h-4 w-4" />
             Save Draft
           </Button>
         </div>

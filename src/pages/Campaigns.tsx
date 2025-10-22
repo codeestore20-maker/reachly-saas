@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, Play, Pause, StopCircle, Edit } from 'lucide-react';
+import { Plus, Search, Filter, Play, Pause, StopCircle, Edit, Send, BookOpen } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { campaigns as campaignsAPI } from '@/lib/api';
 import { CampaignsSkeleton } from '@/components/loading/PageSkeleton';
@@ -232,22 +232,30 @@ export default function Campaigns() {
           ))}
 
           {filteredCampaigns.length === 0 && (
-            <Card className="p-12 text-center">
-              <div className="mx-auto max-w-sm space-y-4">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-                  <Filter className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-semibold text-foreground">No campaigns found</h3>
-                <p className="text-muted-foreground">
-                  {search ? 'Try adjusting your search' : 'Create your first campaign to get started'}
-                </p>
-                {!search && (
-                  <Button onClick={() => navigate('/campaigns/new')} className="bg-gradient-primary">
+            <Card className="p-12 text-center md:col-span-2 lg:col-span-3">
+              <div className="mx-auto w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <Send className="h-12 w-12 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                {search || filter !== 'all' ? 'No campaigns found' : 'No campaigns yet'}
+              </h3>
+              <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
+                {search || filter !== 'all' 
+                  ? 'Try adjusting your search or filters' 
+                  : 'Start your first outreach campaign and connect with your audience'}
+              </p>
+              {!search && filter === 'all' && (
+                <div className="flex gap-3 justify-center">
+                  <Button className="bg-gradient-primary" onClick={() => navigate('/campaigns/new')}>
                     <Plus className="mr-2 h-4 w-4" />
                     Create Campaign
                   </Button>
-                )}
-              </div>
+                  <Button variant="outline" onClick={() => window.open('https://docs.reachly.com', '_blank')}>
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    Learn More
+                  </Button>
+                </div>
+              )}
             </Card>
           )}
         </div>

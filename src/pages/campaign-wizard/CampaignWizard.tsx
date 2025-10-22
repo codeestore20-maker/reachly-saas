@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, ArrowRight, Save, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save, Sparkles, Check } from 'lucide-react';
 import { StepBasics } from './StepBasics';
 import { StepTargets } from './StepTargets';
 import { StepMessage } from './StepMessage';
@@ -69,6 +69,21 @@ export default function CampaignWizard() {
       loadDraft(editId);
     }
   }, [editId]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 's') {
+          e.preventDefault();
+          handleSaveDraft();
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [draft]);
 
   const loadDraft = async (id: string) => {
     try {
@@ -161,11 +176,20 @@ export default function CampaignWizard() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-foreground">Create Campaign</h1>
-            <p className="text-muted-foreground">Set up your outreach campaign in 5 easy steps</p>
+            <h1 className="text-2xl font-bold text-foreground">
+              Create Campaign - Step {currentStep}: {steps[currentStep - 1].name}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {currentStep === 1 && 'Set up basic campaign information'}
+              {currentStep === 2 && 'Choose your target audience'}
+              {currentStep === 3 && 'Craft your message'}
+              {currentStep === 4 && 'Configure pacing and limits'}
+              {currentStep === 5 && 'Review and launch'}
+              <span className="ml-2 text-xs opacity-50">• Tip: Press Ctrl+S to save draft</span>
+            </p>
           </div>
-          <Button variant="outline" onClick={handleSaveDraft}>
-            <Save className="mr-2 h-4 w-4" />
+          <Button variant="outline" onClick={handleSaveDraft} className="gap-2">
+            <Save className="h-4 w-4" />
             Save Draft
           </Button>
         </div>
@@ -174,18 +198,24 @@ export default function CampaignWizard() {
           <div className="flex items-center justify-between">
             {steps.map((step, idx) => (
               <div key={step.id} className="flex items-center">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-full border-2 font-semibold transition-colors ${
+                <div className="flex flex-col items-center gap-2">
+                  <button
+                    onClick={() => currentStep > step.id && setCurrentStep(step.id)}
+                    disabled={currentStep < step.id}
+                    className={`flex h-10 w-10 items-center justify-center rounded-full border-2 font-semibold transition-all ${
                       currentStep === step.id
-                        ? 'border-primary bg-primary text-primary-foreground'
+                        ? 'border-primary bg-primary text-primary-foreground scale-110 shadow-lg'
                         : currentStep > step.id
-                        ? 'border-success bg-success text-success-foreground'
-                        : 'border-muted bg-background text-muted-foreground'
+                        ? 'border-success bg-success text-success-foreground cursor-pointer hover:scale-105'
+                        : 'border-muted bg-background text-muted-foreground cursor-not-allowed'
                     }`}
                   >
-                    {step.id}
-                  </div>
+                    {currentStep > step.id ? (
+                      <Check className="h-5 w-5" />
+                    ) : (
+                      step.id
+                    )}
+                  </button>
                   <span
                     className={`hidden text-sm font-medium md:block ${
                       currentStep >= step.id ? 'text-foreground' : 'text-muted-foreground'
