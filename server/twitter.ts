@@ -231,7 +231,7 @@ async function getUserId(username: string, cookies: TwitterCookies): Promise<str
   return userId;
 }
 
-// إرسال رسالة مباشرة (Updated to use GraphQL conversation endpoint)
+// إرسال رسالة مباشرة (Using correct new2.json endpoint)
 export async function sendDM(
   encryptedCookies: string,
   recipientUsername: string,
@@ -244,7 +244,7 @@ export async function sendDM(
     // البحث عن user ID
     const userId = await getUserId(recipientUsername, cookies);
     
-    // استخدام GraphQL endpoint الحديث لإرسال الرسائل
+    // استخدام endpoint الصحيح لإرسال الرسائل المباشرة
     const requestBody = {
       conversation_id: userId,
       recipient_ids: false,
@@ -257,7 +257,7 @@ export async function sendDM(
     };
 
     const response = await fetch(
-      'https://x.com/i/api/1.1/dm/conversation/create.json',
+      'https://x.com/i/api/1.1/dm/new2.json',
       {
         method: 'POST',
         headers: createBrowserHeaders(cookies, 'application/x-www-form-urlencoded'),
@@ -271,7 +271,6 @@ export async function sendDM(
       const errorText = await response.text();
       console.error('Send DM error - Status:', response.status);
       console.error('Send DM error - Body:', errorText || '(empty response)');
-      console.error('Send DM error - Headers:', JSON.stringify([...response.headers.entries()]));
       return { 
         success: false, 
         error: `HTTP ${response.status}: ${errorText || 'Empty response'}` 

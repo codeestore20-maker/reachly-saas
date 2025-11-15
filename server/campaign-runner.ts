@@ -136,7 +136,7 @@ async function processCampaign(campaignId: number) {
       SELECT * FROM targets
       WHERE campaign_id = $1 
         AND status != 'sent'
-        AND (status = 'pending' OR (status = 'failed' AND retry_count < $2))
+        AND (status = 'pending' OR (status = 'failed' AND retry_count <= $2))
       ORDER BY created_at ASC
       LIMIT 1
     `, [campaignId, campaign.pacing_retry_attempts]);
@@ -211,8 +211,9 @@ async function processCampaign(campaignId: number) {
       console.log(`⏳ [Campaign ${campaignId}] Waiting ${delay.toFixed(1)}s before next message`);
       await new Promise(resolve => setTimeout(resolve, delay * 1000));
     } else {
-      // Check if we should retry (retry_count starts at 1 after first attempt)
-      if (currentRetryCount >= campaign.pacing_retry_attempts) {
+      // Check if we should retry
+      // retry_count now represents total attempts made (1 = first attempt, 2 = first retry, etc.)
+      if (attemptNumber > campaign.pacing_retry_attempts) {
         await query(`
           UPDATE targets
           SET status = 'failed', error_message = $1, updated_at = CURRENT_TIMESTAMP
@@ -225,18 +226,18 @@ async function processCampaign(campaignId: number) {
           WHERE id = $1
         `, [campaignId]);
 
-        console.log(`❌ [Campaign ${campaignId}] Failed permanently to ${target.username} (${currentRetryCount}/${campaign.pacing_retry_attempts} attempts)`);
+        console.log(`❌ [Campaign ${campaignId}] Failed permanently to ${target.username} (${attemptNumber}/${campaign.pacing_retry_attempts} attempts)`);
         // Use configured delay even after failure to maintain pacing
         console.log(`⏳ [Campaign ${campaignId}] Waiting ${delay.toFixed(1)}s before next target`);
         await new Promise(resolve => setTimeout(resolve, delay * 1000));
       } else {
         await query(`
           UPDATE targets
-          SET error_message = $1
+          SET status = 'failed', error_message = $1
           WHERE id = $2
         `, [result.error || 'Unknown error', target.id]);
 
-        console.log(`⚠️  [Campaign ${campaignId}] Failed to ${target.username}, will retry (${currentRetryCount}/${campaign.pacing_retry_attempts})`);
+        console.log(`⚠️  [Campaign ${campaignId}] Failed to ${target.username}, will retry (${attemptNumber}/${campaign.pacing_retry_attempts})`);
         // Use configured delay before retry to maintain consistent pacing
         console.log(`⏳ [Campaign ${campaignId}] Waiting ${delay.toFixed(1)}s before retry`);
         await new Promise(resolve => setTimeout(resolve, delay * 1000));
