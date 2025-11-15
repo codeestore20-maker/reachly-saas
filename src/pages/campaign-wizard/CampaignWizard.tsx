@@ -25,7 +25,6 @@ export interface CampaignDraft {
     perMinute: number;
     delayMin: number;
     delayMax: number;
-    dailyCap: number;
     retryAttempts: number;
   };
 }

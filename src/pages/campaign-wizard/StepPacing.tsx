@@ -21,8 +21,32 @@ export const StepPacing = ({ draft, updateDraft, onNext, onBack }: Props) => {
     });
   };
 
+  // Calculate actual target count
+  const targetCount = draft.selectedFollowers?.length || 0;
+  
+  // Calculate timing based on delays (this is what actually controls speed)
   const avgDelay = (draft.pacing.delayMin + draft.pacing.delayMax) / 2;
-  const estimatedDailyCap = Math.floor(86400 / avgDelay);
+  
+  // Messages per minute limit affects how many we can send in a minute
+  // But actual speed is controlled by avgDelay
+  const messagesPerMinuteByDelay = Math.floor(60 / avgDelay);
+  const effectivePerMinute = Math.min(draft.pacing.perMinute, messagesPerMinuteByDelay);
+  
+  // Calculate actual speed considering both delay and per-minute limit
+  // We need to wait either avgDelay OR ensure we don't exceed perMinute
+  const effectiveDelay = Math.max(avgDelay, 60 / draft.pacing.perMinute);
+  
+  // Theoretical capacity (if unlimited targets)
+  const theoreticalHourlyCap = Math.floor(3600 / effectiveDelay);
+  const theoreticalDailyCap = Math.floor(86400 / effectiveDelay);
+  
+  // Actual estimates based on target count
+  const actualMessagesPerHour = targetCount > 0 ? Math.min(theoreticalHourlyCap, targetCount) : theoreticalHourlyCap;
+  
+  // Time to complete all targets
+  const totalTimeSeconds = targetCount > 0 ? targetCount * effectiveDelay : 0;
+  const hoursToComplete = totalTimeSeconds > 0 ? (totalTimeSeconds / 3600).toFixed(1) : 0;
+  
   const showHighPacingWarning = draft.pacing.perMinute > 20 || avgDelay < 10;
 
   return (
@@ -96,32 +120,64 @@ export const StepPacing = ({ draft, updateDraft, onNext, onBack }: Props) => {
         <div className="space-y-4">
           <Card className="bg-muted p-6">
             <h3 className="mb-4 font-semibold text-foreground">Estimated Timeline</h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Messages per minute:</span>
-                <span className="font-medium text-foreground">
-                  {draft.pacing.perMinute}
-                </span>
+            {targetCount > 0 ? (
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total targets:</span>
+                  <span className="font-medium text-foreground">
+                    {targetCount} users
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Avg. delay per message:</span>
+                  <span className="font-medium text-foreground">
+                    {Math.round(avgDelay)}s
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Messages per hour:</span>
+                  <span className="font-medium text-foreground">
+                    ~{actualMessagesPerHour}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Time to complete:</span>
+                  <span className="font-medium text-foreground">
+                    ~{hoursToComplete} hours
+                  </span>
+                </div>
+                <div className="flex justify-between border-t pt-2">
+                  <span className="text-muted-foreground font-semibold">Campaign will send:</span>
+                  <span className="font-bold text-foreground">
+                    {targetCount} messages
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Messages per hour:</span>
-                <span className="font-medium text-foreground">
-                  ~{draft.pacing.perMinute * 60}
-                </span>
+            ) : (
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Avg. delay per message:</span>
+                  <span className="font-medium text-foreground">
+                    {Math.round(avgDelay)}s
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Theoretical capacity/hour:</span>
+                  <span className="font-medium text-foreground">
+                    ~{Math.floor(3600 / avgDelay)} messages
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Theoretical capacity/day:</span>
+                  <span className="font-medium text-foreground">
+                    ~{theoreticalDailyCap} messages
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground italic mt-2">
+                  Add targets in previous step to see actual timeline
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Estimated daily capacity:</span>
-                <span className="font-medium text-foreground">
-                  ~{Math.floor((86400 / ((draft.pacing.delayMin + draft.pacing.delayMax) / 2)))} messages
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Avg. delay:</span>
-                <span className="font-medium text-foreground">
-                  {Math.round((draft.pacing.delayMin + draft.pacing.delayMax) / 2)}s
-                </span>
-              </div>
-            </div>
+            )}
           </Card>
 
           {showHighPacingWarning && (
