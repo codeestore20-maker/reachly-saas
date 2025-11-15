@@ -47,7 +47,7 @@ export function parseCookies(input: string): TwitterCookies {
   }
 }
 
-// التحقق من الحساب
+// التحقق من الحساب مع fallback تلقائي
 export async function validateTwitterAccount(
   cookies: TwitterCookies,
   expectedUsername: string
@@ -56,72 +56,89 @@ export async function validateTwitterAccount(
     console.log('Validating account:', expectedUsername);
     console.log('Cookies:', { auth_token: cookies.auth_token.substring(0, 10) + '...', ct0: cookies.ct0.substring(0, 10) + '...' });
     
-    const url = `https://x.com/i/api/graphql/G3KGOASz96M-Qu0nwmGXNg/UserByScreenName?variables=${encodeURIComponent(
-      JSON.stringify({ screen_name: expectedUsername, withSafetyModeUserFields: true })
-    )}&features=${encodeURIComponent(
-      JSON.stringify({
-        hidden_profile_likes_enabled: true,
-        hidden_profile_subscriptions_enabled: true,
-        responsive_web_graphql_exclude_directive_enabled: true,
-        verified_phone_label_enabled: false,
-        subscriptions_verification_info_is_identity_verified_enabled: true,
-        subscriptions_verification_info_verified_since_enabled: true,
-        highlights_tweets_tab_ui_enabled: true,
-        responsive_web_twitter_article_notes_tab_enabled: false,
-        creator_subscriptions_tweet_preview_api_enabled: true,
-        responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
-        responsive_web_graphql_timeline_navigation_enabled: true
-      })
-    )}`;
+    // Try multiple Query IDs (Twitter changes them frequently)
+    const queryIds = [
+      'qRednkZG-rn7QJQ88qOjFQ', // Latest (Nov 2024)
+      'xc8f1g7BYqr6VTzTbvNlGw', // Backup 1
+      'G3KGOASz96M-Qu0nwmGXNg', // Old
+      'sLVLhk0bGj3MVFEKTdax1w', // Backup 2
+    ];
+    
+    // Try each Query ID until one works
+    for (const queryId of queryIds) {
+      console.log(`Trying Query ID: ${queryId}`);
+      
+      const url = `https://x.com/i/api/graphql/${queryId}/UserByScreenName?variables=${encodeURIComponent(
+        JSON.stringify({ screen_name: expectedUsername, withSafetyModeUserFields: true })
+      )}&features=${encodeURIComponent(
+        JSON.stringify({
+          hidden_profile_likes_enabled: true,
+          hidden_profile_subscriptions_enabled: true,
+          responsive_web_graphql_exclude_directive_enabled: true,
+          verified_phone_label_enabled: false,
+          subscriptions_verification_info_is_identity_verified_enabled: true,
+          subscriptions_verification_info_verified_since_enabled: true,
+          highlights_tweets_tab_ui_enabled: true,
+          responsive_web_twitter_article_notes_tab_enabled: false,
+          creator_subscriptions_tweet_preview_api_enabled: true,
+          responsive_web_graphql_skip_user_profile_image_extensions_enabled: false,
+          responsive_web_graphql_timeline_navigation_enabled: true
+        })
+      )}`;
 
-    const response = await fetch(url, {
-      headers: {
-        'authorization': `Bearer ${BEARER_TOKEN}`,
-        'cookie': `auth_token=${cookies.auth_token}; ct0=${cookies.ct0}`,
-        'x-csrf-token': cookies.ct0,
-        'x-twitter-auth-type': 'OAuth2Session',
-        'x-twitter-active-user': 'yes',
-        'content-type': 'application/json',
+      const response = await fetch(url, {
+        headers: {
+          'authorization': `Bearer ${BEARER_TOKEN}`,
+          'cookie': `auth_token=${cookies.auth_token}; ct0=${cookies.ct0}`,
+          'x-csrf-token': cookies.ct0,
+          'x-twitter-auth-type': 'OAuth2Session',
+          'x-twitter-active-user': 'yes',
+          'content-type': 'application/json',
+        }
+      });
+
+      console.log(`Query ID ${queryId} - Response status: ${response.status}`);
+
+      if (!response.ok) {
+        console.log(`Query ID ${queryId} failed, trying next...`);
+        continue; // Try next Query ID
       }
-    });
 
-    console.log('Twitter API response status:', response.status);
+      const data = await response.json();
+      console.log('Twitter API response:', JSON.stringify(data).substring(0, 200));
+      
+      const user = data?.data?.user?.result;
+      
+      if (!user || user.rest_id === undefined) {
+        console.log(`Query ID ${queryId} - User not found, trying next...`);
+        continue; // Try next Query ID
+      }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Twitter API error:', errorText);
-      return { valid: false, username: '', avatar: '', error: `HTTP ${response.status}: Invalid credentials` };
+      const username = user.legacy?.screen_name || '';
+      const avatar = user.legacy?.profile_image_url_https || '';
+
+      console.log(`✓ Query ID ${queryId} worked! Found user: ${username}`);
+
+      if (username.toLowerCase() !== expectedUsername.toLowerCase()) {
+        console.error('Username mismatch:', username, 'vs', expectedUsername);
+        return { valid: false, username: '', avatar: '', error: 'Username mismatch' };
+      }
+
+      console.log('✓ Account validated successfully');
+      return { valid: true, username, avatar };
     }
-
-    const data = await response.json();
-    console.log('Twitter API response:', JSON.stringify(data).substring(0, 200));
     
-    const user = data?.data?.user?.result;
+    // If all Query IDs failed
+    console.error('All Query IDs failed');
+    return { valid: false, username: '', avatar: '', error: 'All API endpoints failed. Twitter may have changed their API.' };
     
-    if (!user || user.rest_id === undefined) {
-      console.error('User not found in response');
-      return { valid: false, username: '', avatar: '', error: 'User not found' };
-    }
-
-    const username = user.legacy?.screen_name || '';
-    const avatar = user.legacy?.profile_image_url_https || '';
-
-    console.log('Found user:', username);
-
-    if (username.toLowerCase() !== expectedUsername.toLowerCase()) {
-      console.error('Username mismatch:', username, 'vs', expectedUsername);
-      return { valid: false, username: '', avatar: '', error: 'Username mismatch' };
-    }
-
-    console.log('✓ Account validated successfully');
-    return { valid: true, username, avatar };
   } catch (error) {
     console.error('Validation error:', error);
     return { valid: false, username: '', avatar: '', error: (error as Error).message };
   }
 }
 
-// البحث عن user ID
+// البحث عن user ID مع fallback تلقائي
 async function getUserId(username: string, cookies: TwitterCookies): Promise<string> {
   console.log('Looking up user ID for:', username);
   
@@ -144,36 +161,47 @@ async function getUserId(username: string, cookies: TwitterCookies): Promise<str
     responsive_web_graphql_timeline_navigation_enabled: true
   };
   
-  const url = `https://x.com/i/api/graphql/G3KGOASz96M-Qu0nwmGXNg/UserByScreenName?variables=${encodeURIComponent(
-    JSON.stringify(variables)
-  )}&features=${encodeURIComponent(
-    JSON.stringify(features)
-  )}`;
+  // Try multiple Query IDs
+  const queryIds = [
+    'qRednkZG-rn7QJQ88qOjFQ', // Latest (Nov 2024)
+    'xc8f1g7BYqr6VTzTbvNlGw', // Backup 1
+    'G3KGOASz96M-Qu0nwmGXNg', // Old
+    'sLVLhk0bGj3MVFEKTdax1w', // Backup 2
+  ];
+  
+  for (const queryId of queryIds) {
+    const url = `https://x.com/i/api/graphql/${queryId}/UserByScreenName?variables=${encodeURIComponent(
+      JSON.stringify(variables)
+    )}&features=${encodeURIComponent(
+      JSON.stringify(features)
+    )}`;
 
-  const response = await fetch(url, {
-    headers: {
-      'authorization': `Bearer ${BEARER_TOKEN}`,
-      'cookie': `auth_token=${cookies.auth_token}; ct0=${cookies.ct0}`,
-      'x-csrf-token': cookies.ct0,
-      'x-twitter-auth-type': 'OAuth2Session',
-      'x-twitter-active-user': 'yes',
-      'content-type': 'application/json',
+    const response = await fetch(url, {
+      headers: {
+        'authorization': `Bearer ${BEARER_TOKEN}`,
+        'cookie': `auth_token=${cookies.auth_token}; ct0=${cookies.ct0}`,
+        'x-csrf-token': cookies.ct0,
+        'x-twitter-auth-type': 'OAuth2Session',
+        'x-twitter-active-user': 'yes',
+        'content-type': 'application/json',
+      }
+    });
+
+    console.log(`getUserId with ${queryId} - status: ${response.status}`);
+
+    if (response.ok) {
+      const data = await response.json();
+      const userId = data?.data?.user?.result?.rest_id;
+      
+      if (userId) {
+        console.log(`✓ Found user ID with ${queryId}:`, userId);
+        return userId;
+      }
     }
-  });
-
-  console.log('getUserId response status:', response.status);
-
-  const data = await response.json();
-  const userId = data?.data?.user?.result?.rest_id;
-  
-  console.log('Found user ID:', userId || 'NOT FOUND');
-  
-  if (!userId) {
-    console.error('getUserId response:', JSON.stringify(data).substring(0, 300));
-    throw new Error('User not found: ' + username);
   }
   
-  return userId;
+  // All attempts failed
+  throw new Error('User not found: ' + username + ' (all API endpoints failed)');
 }
 
 // إرسال رسالة مباشرة
