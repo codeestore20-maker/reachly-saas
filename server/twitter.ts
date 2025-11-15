@@ -133,19 +133,36 @@ export async function validateTwitterAccount(
     }
 
     const data = await response.json();
-    console.log('Twitter API response:', JSON.stringify(data).substring(0, 200));
+    console.log('Twitter API response:', JSON.stringify(data).substring(0, 500));
     
     const user = data?.data?.user?.result;
     
     if (!user || user.rest_id === undefined) {
       console.error('User not found in response');
+      console.error('Full response:', JSON.stringify(data));
       return { valid: false, username: '', avatar: '', error: 'User not found' };
     }
 
-    const username = user.legacy?.screen_name || '';
-    const avatar = user.legacy?.profile_image_url_https || '';
+    // Try multiple paths for username (Twitter changes structure)
+    const username = user.legacy?.screen_name || 
+                     user.screen_name || 
+                     user.core?.user_results?.result?.legacy?.screen_name || 
+                     '';
+    
+    const avatar = user.legacy?.profile_image_url_https || 
+                   user.profile_image_url_https ||
+                   user.avatar?.image_url ||
+                   '';
 
     console.log(`✓ Found user: ${username}`);
+    console.log(`User object keys:`, Object.keys(user));
+    console.log(`Legacy object:`, user.legacy ? Object.keys(user.legacy) : 'N/A');
+
+    if (!username) {
+      console.error('Username not found in user object');
+      console.error('User structure:', JSON.stringify(user, null, 2).substring(0, 1000));
+      return { valid: false, username: '', avatar: '', error: 'Username not found in response' };
+    }
 
     if (username.toLowerCase() !== expectedUsername.toLowerCase()) {
       console.error('Username mismatch:', username, 'vs', expectedUsername);
