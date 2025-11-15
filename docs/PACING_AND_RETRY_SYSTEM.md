@@ -1,336 +1,430 @@
-# 🎯 نظام Pacing & Retry - الشرح الكامل
+# 🎯 Pacing & Retry System - Complete Guide
 
-## المشاكل التي تم إصلاحها ✅
+## Overview
 
-### 1. ❌ المشكلة: Retry Attempts لا يعمل
-**قبل الإصلاح:**
-- عند فشل الرسالة، يتم تحديث الحالة إلى `failed` مباشرة
-- لا يتم إعادة المحاولة أبداً
-- `pacing_retry_attempts` كان مجرد رقم في قاعدة البيانات بدون استخدام
-
-**بعد الإصلاح:**
-- يتم تتبع عدد المحاولات لكل هدف في `retry_count`
-- عند الفشل، يتم زيادة `retry_count` والمحاولة مرة أخرى
-- يتم تحديث الحالة إلى `failed` فقط بعد استنفاد جميع المحاولات
-
-### 2. ❌ المشكلة: الرسائل الناجحة قد تتكرر
-**قبل الإصلاح:**
-- لا يوجد فحص لمنع إرسال رسالة لنفس المستخدم مرتين
-- يمكن أن يتم إرسال رسالة لنفس الشخص عدة مرات في نفس الحملة
-
-**بعد الإصلاح:**
-- يتم فحص ما إذا تم الإرسال بالفعل لهذا المستخدم
-- إذا كانت الحالة `sent`، يتم تخطي الهدف تلقائياً
-- يتم تحديث الحالة إلى `skipped` مع رسالة توضيحية
-
-### 3. ❌ المشكلة: Messages per Minute لا يُحترم
-**قبل الإصلاح:**
-- كان يتم إرسال رسالة كل 5 ثوانٍ بغض النظر عن الإعدادات
-- يمكن إرسال 12 رسالة في الدقيقة حتى لو كان الإعداد 3!
-
-**بعد الإصلاح:**
-- يتم تتبع الرسائل المرسلة في آخر 60 ثانية
-- لا يتم إرسال رسالة جديدة إذا وصلنا للحد الأقصى
-- يتم الانتظار تلقائياً حتى تمر دقيقة
+The Pacing & Retry system is designed to protect your Twitter accounts from being banned while maximizing campaign effectiveness.
 
 ---
 
-## كيف يعمل نظام Retry الجديد؟
+## System Components
 
-### مثال عملي:
+### 1. **Pacing (Rate Limiting)**
 
-**الإعدادات:**
-```
-Retry Attempts: 3
-Messages per Minute: 3
-Daily Cap: 50
-```
+Controls how fast messages/follows are sent to avoid Twitter's rate limits.
 
-**السيناريو:**
+#### Settings:
 
-#### المحاولة الأولى (Attempt 1)
-```
-📤 Sending to @user123 (1/3 per min, 1/50 today)
-❌ Failed: Rate limit exceeded
-⚠️  Failed attempt 1/3 to @user123 - will retry
-```
-- `retry_count` = 1
-- `status` = 'pending' (لا يزال)
-- `last_attempt_at` = الآن
+| Setting | Description | Range | Default |
+|---------|-------------|-------|---------|
+| **Messages per Minute** | Max actions per 60 seconds | 1-10 | 3 |
+| **Delay Min** | Minimum wait between actions (seconds) | 5-60 | 15 |
+| **Delay Max** | Maximum wait between actions (seconds) | 10-120 | 30 |
+| **Daily Cap** | Maximum actions per day | 1-500 | 50 |
 
-#### المحاولة الثانية (Attempt 2)
-```
-📤 Retry #2 to @user123 (2/3 per min, 2/50 today)
-❌ Failed: Connection timeout
-⚠️  Failed attempt 2/3 to @user123 - will retry
-```
-- `retry_count` = 2
-- `status` = 'pending' (لا يزال)
-- `last_attempt_at` = الآن
+#### How It Works:
 
-#### المحاولة الثالثة (Attempt 3)
-```
-📤 Retry #3 to @user123 (3/3 per min, 3/50 today)
-✅ Retry succeeded to @user123
-```
-- `retry_count` = 3
-- `status` = 'sent' ✅
-- `sent_at` = الآن
+```typescript
+// Example: 3 messages per minute, 15-30s delay
 
-#### إذا فشلت جميع المحاولات:
-```
-📤 Retry #3 to @user456 (1/3 per min, 4/50 today)
-❌ Failed: User not found
-❌ Failed permanently to @user456 after 3 attempts
-```
-- `retry_count` = 3
-- `status` = 'failed' ❌
-- `error_message` = "User not found"
-
----
-
-## كيف يعمل نظام Pacing؟
-
-### 1. Messages per Minute (رسائل في الدقيقة)
-
-**الآلية:**
-- يتم حفظ timestamp لكل رسالة مرسلة
-- قبل إرسال رسالة جديدة، يتم حساب عدد الرسائل في آخر 60 ثانية
-- إذا وصلنا للحد، ننتظر حتى تخرج أقدم رسالة من النافذة الزمنية
-
-**مثال:**
-```
-الإعداد: 3 رسائل/دقيقة
-
-0:00 → رسالة #1 ✅
-0:20 → رسالة #2 ✅
-0:40 → رسالة #3 ✅
-0:50 → محاولة #4 ❌ (3/3 - انتظر)
-1:01 → رسالة #4 ✅ (الرسالة #1 خرجت من النافذة)
+Message 1 sent at 00:00
+  ↓ Wait 23s (random between 15-30)
+Message 2 sent at 00:23
+  ↓ Wait 18s
+Message 3 sent at 00:41
+  ↓ Wait until 01:00 (per-minute limit reached)
+Message 4 sent at 01:00
 ```
 
-### 2. Daily Cap (الحد اليومي)
+### 2. **Retry System**
 
-**الآلية:**
-- يتم حساب عدد محاولات الإرسال (ناجحة + فاشلة) في اليوم الحالي
-- عند الوصول للحد، يتم إيقاف الحملة تلقائياً
-- يتم احتساب المحاولات الفاشلة أيضاً لأنها تستهلك من Rate Limit
+Handles failed attempts intelligently.
 
-**مثال:**
+#### Settings:
+
+| Retry Attempts | Total Attempts | Behavior |
+|----------------|----------------|----------|
+| 0 | 1 | No retries, fail immediately |
+| 1 | 2 | One retry after failure |
+| 2 | 3 | Two retries after failure |
+| 3 | 4 | Three retries after failure |
+
+#### Logic Flow:
+
 ```
-الإعداد: 50 رسالة/يوم
-
-اليوم:
-- 40 رسالة ناجحة
-- 8 رسائل فاشلة (مع إعادة المحاولة)
-- المجموع: 48 محاولة
-
-المتبقي: 2 محاولة فقط
-```
-
-### 3. Random Delay (التأخير العشوائي)
-
-**الآلية:**
-- بعد كل رسالة ناجحة، يتم الانتظار لمدة عشوائية
-- المدة بين `delayMin` و `delayMax`
-- يجعل الإرسال يبدو طبيعياً وليس آلياً
-
-**مثال:**
-```
-الإعداد: 15-30 ثانية
-
-رسالة #1 → انتظار 18.3 ثانية
-رسالة #2 → انتظار 24.7 ثانية
-رسالة #3 → انتظار 29.1 ثانية
+Attempt 1: Send message
+  ↓
+  ✅ Success? → Mark as 'sent', move to next
+  ↓
+  ❌ Permanent Error (403)? → Mark as 'skipped', move to next
+  ↓
+  ⚠️ Temporary Error?
+    ↓
+    Check: attemptNumber < maxAttempts?
+      ↓
+      Yes → Wait delay, retry
+      ↓
+      No → Mark as 'failed', move to next
 ```
 
 ---
 
-## Database Schema الجديد
+## Error Types
 
-### جدول targets
+### Permanent Errors (No Retry)
 
-```sql
-CREATE TABLE targets (
-  id INTEGER PRIMARY KEY,
-  campaign_id INTEGER,
-  username TEXT,
-  handle TEXT,
-  name TEXT,
-  avatar TEXT,
-  status TEXT DEFAULT 'pending',  -- pending, sent, failed, skipped
-  retry_count INTEGER DEFAULT 0,   -- ✅ جديد: عدد المحاولات
-  last_attempt_at DATETIME,        -- ✅ جديد: آخر محاولة
-  sent_at DATETIME,
-  replied_at DATETIME,
-  error_message TEXT
-);
-```
+These errors will never succeed, so we skip immediately:
 
-### حالات الـ status
-
-| Status | الوصف | متى يحدث |
-|--------|-------|----------|
-| `pending` | في انتظار الإرسال | الحالة الافتراضية |
-| `sent` | تم الإرسال بنجاح | بعد إرسال ناجح |
-| `failed` | فشل نهائياً | بعد استنفاد جميع المحاولات |
-| `skipped` | تم التخطي | إذا تم الإرسال بالفعل لهذا المستخدم |
-
----
-
-## منطق اختيار الهدف التالي
-
-```sql
-SELECT * FROM targets
-WHERE campaign_id = ? 
-  AND status != 'sent'           -- ✅ لم يتم الإرسال بنجاح
-  AND retry_count < ?            -- ✅ لا زالت هناك محاولات متبقية
-ORDER BY 
-  CASE WHEN status = 'pending' THEN 0 ELSE 1 END,  -- ✅ أولوية للجديد
-  id ASC                         -- ✅ ثم حسب الترتيب
-LIMIT 1
-```
-
-**الأولويات:**
-1. الأهداف الجديدة (`pending`) أولاً
-2. ثم الأهداف الفاشلة التي لا زالت لديها محاولات
-3. حسب ترتيب الإضافة (id)
-
----
-
-## Logging المحسّن
-
-### رسالة جديدة
-```
-📤 [Campaign 1] Sending to @user123 (1/3 per min, 5/50 today)
-✅ [Campaign 1] Sent to @user123 - waiting 18.3s
-```
-
-### إعادة محاولة
-```
-📤 [Campaign 1] Retry #2 to @user456 (2/3 per min, 6/50 today)
-✅ [Campaign 1] Retry succeeded to @user456 - waiting 24.7s
-```
-
-### فشل مع محاولات متبقية
-```
-📤 [Campaign 1] Retry #1 to @user789 (3/3 per min, 7/50 today)
-⚠️  [Campaign 1] Failed attempt 1/3 to @user789: Rate limit - will retry
-```
-
-### فشل نهائي
-```
-📤 [Campaign 1] Retry #3 to @user999 (1/3 per min, 8/50 today)
-❌ [Campaign 1] Failed permanently to @user999 after 3 attempts: User not found
-```
-
-### تخطي (مكرر)
-```
-⏭️  [Campaign 1] Skipped @user111 - already sent in this campaign
-```
-
-### وصول للحد اليومي
-```
-⚠️  Campaign 1 reached daily cap (50 attempts)
-⏸️  Campaign 1 paused
-```
-
----
-
-## كيفية الاستخدام
-
-### 1. تحديث قاعدة البيانات
-
-إذا كان لديك قاعدة بيانات موجودة:
-```bash
-node migrate-add-retry-fields.js
-```
-
-أو ابدأ من الصفر:
-```bash
-npm run reset-db
-```
-
-### 2. إنشاء حملة بإعدادات Retry
-
-```javascript
+#### 1. **403 - Privacy Settings**
+```json
 {
-  name: "Test Campaign",
-  pacing: {
-    perMinute: 3,        // 3 رسائل في الدقيقة
-    delayMin: 15,        // 15 ثانية كحد أدنى
-    delayMax: 30,        // 30 ثانية كحد أقصى
-    dailyCap: 50,        // 50 محاولة في اليوم
-    retryAttempts: 3     // ✅ 3 محاولات لكل رسالة فاشلة
-  }
+  "code": 349,
+  "message": "You cannot send messages to this user."
 }
 ```
 
-### 3. مراقبة النتائج
+**Reason:** User doesn't accept DMs from non-followers
 
-راقب Console للحصول على معلومات مفصلة:
-- عدد المحاولات لكل رسالة
-- معدل الإرسال الحالي
-- الرسائل الناجحة والفاشلة
-- الأهداف المتخطاة
+**Action:** Status set to `skipped`, no retry
+
+**Solution:** Follow user first, wait 1-2 days, then DM
+
+#### 2. **404 - User Not Found**
+```json
+{
+  "code": 50,
+  "message": "User not found."
+}
+```
+
+**Reason:** Username doesn't exist or account deleted
+
+**Action:** Status set to `skipped`, no retry
+
+**Solution:** Verify username is correct
+
+### Temporary Errors (Will Retry)
+
+These might succeed on retry:
+
+#### 1. **500 - Server Error**
+```json
+{
+  "code": 131,
+  "message": "Internal error."
+}
+```
+
+**Reason:** Twitter server issue
+
+**Action:** Retry after delay
+
+#### 2. **Network Timeout**
+
+**Reason:** Connection issue
+
+**Action:** Retry after delay
 
 ---
 
-## الأسئلة الشائعة
+## Status Types
 
-**س: ماذا يحدث إذا فشلت رسالة؟**
+| Status | Meaning | Next Action |
+|--------|---------|-------------|
+| `pending` | Not attempted yet | Will be processed |
+| `sent` | Successfully sent | Done ✅ |
+| `failed` | Failed after all retries | Done ❌ |
+| `skipped` | Permanent error (403/404) | Done ⏭️ |
 
-ج: يتم زيادة `retry_count` والمحاولة مرة أخرى لاحقاً. إذا فشلت جميع المحاولات، يتم تحديث الحالة إلى `failed`.
+### Database Query
 
-**س: هل تُحسب المحاولات الفاشلة من الحد اليومي؟**
+The system only processes targets with:
+```sql
+WHERE status = 'pending' 
+   OR (status = 'failed' AND retry_count < maxAttempts)
+```
 
-ج: نعم، لأنها تستهلك من Rate Limit الخاص بـ Twitter.
-
-**س: ماذا لو تم إرسال رسالة لنفس المستخدم مرتين؟**
-
-ج: النظام يفحص تلقائياً ويتخطى المستخدمين الذين تم الإرسال لهم بالفعل.
-
-**س: كم من الوقت بين المحاولات؟**
-
-ج: يعتمد على `delayMin` و `delayMax`. بعد الفشل، هناك تأخير قصير (5 ثوانٍ) قبل المحاولة التالية.
-
-**س: هل يمكنني تغيير عدد المحاولات أثناء تشغيل الحملة؟**
-
-ج: نعم، لكن يجب إيقاف الحملة وإعادة تشغيلها لتطبيق الإعدادات الجديدة.
-
-**س: ماذا يحدث عند إعادة تشغيل السيرفر؟**
-
-ج: يتم استئناف الحملات النشطة تلقائياً، ويتم الاحتفاظ بـ `retry_count` لكل هدف.
+This ensures:
+- ✅ `sent` targets are never retried
+- ✅ `skipped` targets are never retried
+- ✅ `failed` targets are only retried if attempts remain
 
 ---
 
-## نصائح للاستخدام الأمثل
+## Configuration Examples
 
-### للحسابات الجديدة
-```
-Messages per Minute: 2
-Delay: 20-40 seconds
-Daily Cap: 30
-Retry Attempts: 2
+### Conservative (Safest)
+
+**Best for:**
+- New accounts
+- High-value accounts
+- First campaigns
+
+```typescript
+{
+  perMinute: 2,
+  delayMin: 20,
+  delayMax: 40,
+  dailyCap: 50,
+  retryAttempts: 0
+}
 ```
 
-### للحسابات المعتمدة
-```
-Messages per Minute: 3-4
-Delay: 15-30 seconds
-Daily Cap: 50-60
-Retry Attempts: 3
+**Expected Speed:** ~30 messages/hour, 50/day
+
+### Moderate (Balanced)
+
+**Best for:**
+- Established accounts
+- Regular use
+- Most users
+
+```typescript
+{
+  perMinute: 3,
+  delayMin: 15,
+  delayMax: 30,
+  dailyCap: 100,
+  retryAttempts: 1
+}
 ```
 
-### للحسابات الموثوقة
+**Expected Speed:** ~60 messages/hour, 100/day
+
+### Aggressive (Risky)
+
+**Best for:**
+- Burner accounts
+- High volume needs
+- Experienced users
+
+```typescript
+{
+  perMinute: 5,
+  delayMin: 10,
+  delayMax: 20,
+  dailyCap: 200,
+  retryAttempts: 2
+}
 ```
-Messages per Minute: 5
-Delay: 10-20 seconds
-Daily Cap: 80-100
-Retry Attempts: 3
+
+**Expected Speed:** ~120 messages/hour, 200/day
+
+⚠️ **Warning:** Higher risk of account restrictions
+
+---
+
+## Best Practices
+
+### 1. Start Slow
+
+Begin with conservative settings:
+- 2 messages per minute
+- 20-40 second delays
+- 50 daily cap
+- 0 retry attempts
+
+Monitor for 2-3 days, then gradually increase.
+
+### 2. Monitor Failure Rate
+
+| Failure Rate | Action |
+|--------------|--------|
+| < 10% | Good, can increase speed |
+| 10-20% | Acceptable, maintain settings |
+| 20-30% | High, reduce speed |
+| > 30% | Critical, stop and review |
+
+### 3. Respect Daily Caps
+
+Don't exceed:
+- **New accounts:** 50 messages/day
+- **Established accounts:** 100 messages/day
+- **Verified accounts:** 200 messages/day
+
+### 4. Use Random Delays
+
+Always use a range (min/max) rather than fixed delays:
+- ✅ Good: 15-30 seconds (random)
+- ❌ Bad: 20 seconds (fixed)
+
+Random delays appear more human-like.
+
+### 5. Follow Before DM
+
+To reduce 403 errors:
+1. Run Follow Campaign first
+2. Wait 24-48 hours
+3. Then run DM Campaign
+
+This significantly improves success rate.
+
+---
+
+## Technical Implementation
+
+### Message Log Tracking
+
+```typescript
+interface MessageLog {
+  timestamp: number;
+  campaignId: number;
+}
+
+// Track last 60 seconds
+const messageLog = new Map<number, MessageLog[]>();
+
+function getMessagesInLastMinute(campaignId: number): number {
+  const logs = messageLog.get(campaignId) || [];
+  const oneMinuteAgo = Date.now() - 60000;
+  return logs.filter(log => log.timestamp > oneMinuteAgo).length;
+}
+```
+
+### Retry Count Tracking
+
+```typescript
+// In database
+interface Target {
+  id: number;
+  retry_count: number;  // Incremented on each attempt
+  status: 'pending' | 'sent' | 'failed' | 'skipped';
+  last_attempt_at: Date;
+  error_message: string;
+}
+
+// Logic
+const currentRetryCount = target.retry_count || 0;
+const attemptNumber = currentRetryCount + 1;
+const maxAttempts = campaign.pacing_retry_attempts + 1;
+
+if (attemptNumber >= maxAttempts) {
+  // No more retries
+  status = 'failed';
+} else {
+  // Will retry
+  status = 'failed'; // Temporary, will be picked up again
+}
+```
+
+### Delay Calculation
+
+```typescript
+function calculateDelay(min: number, max: number): number {
+  return min + Math.random() * (max - min);
+}
+
+// Example: min=15, max=30
+// Result: Random between 15.0 and 30.0 seconds
 ```
 
 ---
 
-**تم التحديث**: يناير 2025  
-**الإصدار**: 1.2.0 - نظام Retry كامل
+## Monitoring & Analytics
+
+### Campaign Stats
+
+Track these metrics:
+
+```typescript
+interface CampaignStats {
+  stats_total: number;      // Total targets
+  stats_sent: number;       // Successfully sent
+  stats_failed: number;     // Failed after retries
+  stats_skipped: number;    // Skipped (403/404)
+}
+
+// Success Rate
+const successRate = (stats_sent / stats_total) * 100;
+
+// Failure Rate
+const failureRate = (stats_failed / stats_total) * 100;
+
+// Skip Rate (Privacy)
+const skipRate = (stats_skipped / stats_total) * 100;
+```
+
+### Health Indicators
+
+| Metric | Healthy | Warning | Critical |
+|--------|---------|---------|----------|
+| Success Rate | > 70% | 50-70% | < 50% |
+| Failure Rate | < 10% | 10-20% | > 20% |
+| Skip Rate | < 20% | 20-40% | > 40% |
+
+---
+
+## Troubleshooting
+
+### Problem: Too Many 403 Errors
+
+**Symptoms:** High skip rate (>30%)
+
+**Solutions:**
+1. Follow users before sending DMs
+2. Target users who follow you
+3. Improve message quality
+4. Check account reputation
+
+### Problem: Rate Limit Errors
+
+**Symptoms:** 429 errors, campaign pauses
+
+**Solutions:**
+1. Increase `delayMin` and `delayMax`
+2. Reduce `perMinute`
+3. Lower `dailyCap`
+4. Add more delay between campaigns
+
+### Problem: High Failure Rate
+
+**Symptoms:** Many failed targets
+
+**Solutions:**
+1. Check account health
+2. Verify cookies are valid
+3. Test with manual DM first
+4. Review error messages
+
+---
+
+## Migration Notes
+
+### v2.0.0 Changes
+
+**Default Retry Attempts:** 2 → 0
+
+**Reason:** Most users prefer no automatic retries
+
+**Migration:** Automatic via database migration
+
+**Impact:** Existing campaigns updated to 0 retries
+
+**Action:** Review campaign settings if you want retries
+
+---
+
+## Future Enhancements
+
+### Planned Features
+
+1. **Adaptive Pacing:** Auto-adjust based on success rate
+2. **Smart Scheduling:** Send during optimal times
+3. **Account Health Monitoring:** Track account status
+4. **Predictive Analytics:** Estimate success probability
+
+---
+
+## Conclusion
+
+The Pacing & Retry system is designed to:
+- ✅ Protect your accounts from bans
+- ✅ Maximize campaign success
+- ✅ Handle errors intelligently
+- ✅ Provide full control
+
+Start conservative, monitor results, and adjust gradually.
+
+For more details, see:
+- [DM_SYSTEM.md](DM_SYSTEM.md) - DM-specific details
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Common issues
+- [API_DOCS.md](API_DOCS.md) - API reference
