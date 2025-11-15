@@ -107,7 +107,7 @@ export default function CampaignWizard() {
           delayMin: campaign.pacing_delay_min || 15,
           delayMax: campaign.pacing_delay_max || 30,
           dailyCap: campaign.pacing_daily_cap || 50,
-          retryAttempts: campaign.pacing_retry_attempts || 2,
+          retryAttempts: campaign.pacing_retry_attempts ?? 0,
         },
       });
       toast.success('Draft loaded successfully!');

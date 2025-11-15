@@ -217,12 +217,17 @@ async function processCampaign(campaignId: number) {
       console.log(`⏳ [Campaign ${campaignId}] Waiting ${delay.toFixed(1)}s before next message`);
       await new Promise(resolve => setTimeout(resolve, delay * 1000));
     } else {
+      // Check for permanent errors that shouldn't be retried
+      const isPermanentError = result.error?.includes('403') || 
+                               result.error?.includes('cannot send messages') ||
+                               result.error?.includes('code":349');
+      
       // Check if we should retry
       // pacing_retry_attempts = 0 means 1 total attempt (no retries)
       // pacing_retry_attempts = 1 means 2 total attempts (1 retry)
       const maxAttempts = campaign.pacing_retry_attempts + 1;
       
-      if (attemptNumber >= maxAttempts) {
+      if (attemptNumber >= maxAttempts || isPermanentError) {
         // No more retries allowed - mark as permanently failed
         await query(`
           UPDATE targets
@@ -236,7 +241,8 @@ async function processCampaign(campaignId: number) {
           WHERE id = $1
         `, [campaignId]);
 
-        console.log(`❌ [Campaign ${campaignId}] Failed permanently to ${target.username} (${attemptNumber}/${maxAttempts} attempts)`);
+        const reason = isPermanentError ? 'user privacy settings' : `${attemptNumber}/${maxAttempts} attempts`;
+        console.log(`❌ [Campaign ${campaignId}] Failed permanently to ${target.username} (${reason})`);
         // Use configured delay even after failure to maintain pacing
         console.log(`⏳ [Campaign ${campaignId}] Waiting ${delay.toFixed(1)}s before next target`);
         await new Promise(resolve => setTimeout(resolve, delay * 1000));

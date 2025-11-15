@@ -281,6 +281,15 @@ export async function initializeDatabase(): Promise<void> {
     } catch (error) {
       logger.warn('Targets updated_at column migration skipped');
     }
+    
+    // Change default retry attempts from 2 to 0 (migration)
+    try {
+      await query(`ALTER TABLE campaigns ALTER COLUMN pacing_retry_attempts SET DEFAULT 0`);
+      await query(`ALTER TABLE follow_campaigns ALTER COLUMN pacing_retry_attempts SET DEFAULT 0`);
+      logger.info('✓ Updated pacing_retry_attempts default to 0');
+    } catch (error) {
+      logger.warn('Retry attempts default migration skipped');
+    }
 
     await query(`
       CREATE TABLE IF NOT EXISTS follow_campaigns (
