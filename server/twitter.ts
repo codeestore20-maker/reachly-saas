@@ -8,9 +8,9 @@ export interface TwitterCookies {
 
 const BEARER_TOKEN = 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 
-// Working Query IDs (Updated November 2024 from twscrape)
+// Working Query IDs (Updated November 15, 2024 - Extracted from live Twitter)
 const WORKING_QUERY_IDS = {
-  UserByScreenName: '32pL5BWe9WKeSK1MoPvFQQ',
+  UserByScreenName: 'ZHSN3WlvahPKVvUxVQbg1A', // ✅ WORKING (Nov 15, 2024)
   Followers: 'OGScL-RC4DFMsRGOCjPR6g',
   Following: 'o5eNLkJb03ayTQa97Cpp7w',
   UserMedia: 'ophTtKkfXcUKnXlxh9fU5w',
@@ -396,7 +396,7 @@ async function extractFollowersGraphQL(
   
   const data = await response.json();
   const entries = data?.data?.user?.result?.timeline?.timeline?.instructions?.find(
-    (i: any) => i.type === 'TimelineAddEntries'
+    (i: unknown) => i.type === 'TimelineAddEntries'
   )?.entries || [];
   
   if (entries.length > 0) {
