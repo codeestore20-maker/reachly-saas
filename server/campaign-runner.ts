@@ -132,14 +132,20 @@ async function processCampaign(campaignId: number) {
       return;
     }
 
+    // Get next target that hasn't been sent and hasn't exceeded retry limit
+    // pacing_retry_attempts = 0 means 1 total attempt (no retries)
+    // pacing_retry_attempts = 1 means 2 total attempts (1 retry)
+    // pacing_retry_attempts = 2 means 3 total attempts (2 retries)
+    const maxAttempts = campaign.pacing_retry_attempts + 1;
+    
     const targetResult = await query(`
       SELECT * FROM targets
       WHERE campaign_id = $1 
         AND status != 'sent'
-        AND (status = 'pending' OR (status = 'failed' AND retry_count <= $2))
+        AND (status = 'pending' OR (status = 'failed' AND retry_count < $2))
       ORDER BY created_at ASC
       LIMIT 1
-    `, [campaignId, campaign.pacing_retry_attempts]);
+    `, [campaignId, maxAttempts]);
 
     const target = targetResult.rows[0];
 
@@ -212,8 +218,12 @@ async function processCampaign(campaignId: number) {
       await new Promise(resolve => setTimeout(resolve, delay * 1000));
     } else {
       // Check if we should retry
-      // retry_count now represents total attempts made (1 = first attempt, 2 = first retry, etc.)
-      if (attemptNumber > campaign.pacing_retry_attempts) {
+      // pacing_retry_attempts = 0 means 1 total attempt (no retries)
+      // pacing_retry_attempts = 1 means 2 total attempts (1 retry)
+      const maxAttempts = campaign.pacing_retry_attempts + 1;
+      
+      if (attemptNumber >= maxAttempts) {
+        // No more retries allowed - mark as permanently failed
         await query(`
           UPDATE targets
           SET status = 'failed', error_message = $1, updated_at = CURRENT_TIMESTAMP
@@ -226,18 +236,19 @@ async function processCampaign(campaignId: number) {
           WHERE id = $1
         `, [campaignId]);
 
-        console.log(`❌ [Campaign ${campaignId}] Failed permanently to ${target.username} (${attemptNumber}/${campaign.pacing_retry_attempts} attempts)`);
+        console.log(`❌ [Campaign ${campaignId}] Failed permanently to ${target.username} (${attemptNumber}/${maxAttempts} attempts)`);
         // Use configured delay even after failure to maintain pacing
         console.log(`⏳ [Campaign ${campaignId}] Waiting ${delay.toFixed(1)}s before next target`);
         await new Promise(resolve => setTimeout(resolve, delay * 1000));
       } else {
+        // Still have retries left - keep status as 'failed' so it will be retried
         await query(`
           UPDATE targets
           SET status = 'failed', error_message = $1
           WHERE id = $2
         `, [result.error || 'Unknown error', target.id]);
 
-        console.log(`⚠️  [Campaign ${campaignId}] Failed to ${target.username}, will retry (${attemptNumber}/${campaign.pacing_retry_attempts})`);
+        console.log(`⚠️  [Campaign ${campaignId}] Failed to ${target.username}, will retry (${attemptNumber}/${maxAttempts})`);
         // Use configured delay before retry to maintain consistent pacing
         console.log(`⏳ [Campaign ${campaignId}] Waiting ${delay.toFixed(1)}s before retry`);
         await new Promise(resolve => setTimeout(resolve, delay * 1000));

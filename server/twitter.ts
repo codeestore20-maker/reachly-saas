@@ -231,7 +231,7 @@ async function getUserId(username: string, cookies: TwitterCookies): Promise<str
   return userId;
 }
 
-// إرسال رسالة مباشرة (Using correct new2.json endpoint)
+// إرسال رسالة مباشرة (Using GraphQL endpoint)
 export async function sendDM(
   encryptedCookies: string,
   recipientUsername: string,
@@ -244,24 +244,28 @@ export async function sendDM(
     // البحث عن user ID
     const userId = await getUserId(recipientUsername, cookies);
     
-    // استخدام endpoint الصحيح لإرسال الرسائل المباشرة
-    const requestBody = {
-      conversation_id: userId,
-      recipient_ids: false,
-      request_id: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
-      text: message,
-      cards_platform: 'Web-12',
-      include_cards: 1,
-      include_quote_count: true,
-      dm_users: false
+    // استخدام GraphQL endpoint لإرسال الرسائل المباشرة
+    const queryId = 'rOnvUbWf-Sq7CzEHnRWRVw'; // DM mutation Query ID
+    
+    const variables = {
+      message: {
+        text: {
+          text: message
+        }
+      },
+      conversationId: userId,
+      requestId: `${Date.now()}-${Math.random().toString(36).substring(7)}`
     };
 
     const response = await fetch(
-      'https://x.com/i/api/1.1/dm/new2.json',
+      `https://x.com/i/api/graphql/${queryId}/useSendMessageMutation`,
       {
         method: 'POST',
-        headers: createBrowserHeaders(cookies, 'application/x-www-form-urlencoded'),
-        body: new URLSearchParams(requestBody as Record<string, string>).toString()
+        headers: createBrowserHeaders(cookies, 'application/json'),
+        body: JSON.stringify({
+          variables,
+          queryId
+        })
       }
     );
 
@@ -277,9 +281,9 @@ export async function sendDM(
       };
     }
 
-    const responseData = await response.text();
+    const responseData = await response.json();
     console.log('✓ DM sent successfully to', recipientUsername);
-    console.log('Response:', responseData.substring(0, 200));
+    console.log('Response:', JSON.stringify(responseData).substring(0, 200));
     return { success: true };
   } catch (error) {
     console.error('Send DM exception:', error);
