@@ -231,7 +231,7 @@ async function getUserId(username: string, cookies: TwitterCookies): Promise<str
   return userId;
 }
 
-// إرسال رسالة مباشرة (Updated to use new API endpoint)
+// إرسال رسالة مباشرة (Updated to use correct DM endpoint)
 export async function sendDM(
   encryptedCookies: string,
   recipientUsername: string,
@@ -244,16 +244,15 @@ export async function sendDM(
     // البحث عن user ID
     const userId = await getUserId(recipientUsername, cookies);
     
-    // إرسال الرسالة عبر REST API v1.1
+    // إرسال الرسالة عبر REST API v1.1 - استخدام endpoint الصحيح
     const response = await fetch(
-      'https://x.com/i/api/1.1/dm/welcome_messages/add_to_conversation.json',
+      'https://x.com/i/api/1.1/dm/new.json',
       {
         method: 'POST',
         headers: createBrowserHeaders(cookies, 'application/x-www-form-urlencoded'),
         body: new URLSearchParams({
           'recipient_id': userId,
-          'text': message,
-          'cards_platform': 'Web-12',
+          'text': message
         }).toString()
       }
     );
