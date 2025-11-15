@@ -21,10 +21,12 @@ dist-ssr
 .env.local
 .env.production
 
-# Backups
+# Backups & Temporary
 *.tar.gz
 *.zip
 *.backup
+sooolve
+*.tmp
 
 # Editor directories and files
 .vscode/*

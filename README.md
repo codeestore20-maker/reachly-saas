@@ -1,227 +1,179 @@
-# 🚀 Reachly - Twitter Outreach Automation Platform
+# 🚀 Reachly SaaS - Twitter Automation Platform
 
-**منصة أتمتة التواصل على Twitter** - نظام شامل لإدارة حملات الرسائل المباشرة والمتابعة مع أتمتة كاملة ونظام Pacing & Retry محكم.
+[![Deploy on Render](https://img.shields.io/badge/Deploy-Render-success)](https://render.com)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-green)](https://nodejs.org)
+[![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
-[![Deploy Status](https://img.shields.io/badge/Deploy-Render-success)](https://render.com)
-[![Tech Stack](https://img.shields.io/badge/Stack-React%20%2B%20Node.js-blue)](#)
-[![Database](https://img.shields.io/badge/Database-PostgreSQL-blue)](#)
-[![Cache](https://img.shields.io/badge/Cache-Redis-red)](#)
-
-## 📋 جدول المحتويات
-
-- [🚀 البدء السريع](#-البدء-السريع)
-- [✨ الميزات](#-الميزات)
-- [🏗️ التقنيات المستخدمة](#️-التقنيات-المستخدمة)
-- [📁 هيكل المشروع](#-هيكل-المشروع)
-- [🎯 الاستخدام](#-الاستخدام)
-- [📚 التوثيق](#-التوثيق)
-- [🔧 الإعدادات](#-الإعدادات)
-
----
-
-## 🚀 البدء السريع
-
-### 1. التثبيت
-```bash
-npm install
-```
-
-### 2. إعداد البيئة
-أنشئ ملف `.env.local`:
-```env
-JWT_SECRET=your-jwt-secret-here
-COOKIE_ENCRYPTION_KEY=your-encryption-key-here
-PORT=3001
-```
-
-لتوليد مفاتيح آمنة:
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-### 3. إعداد قاعدة البيانات
-```bash
-# إذا كانت أول مرة
-npm run reset-db
-
-# إذا كنت تحدّث من نسخة قديمة
-node migrate-add-retry-fields.js
-```
-
-### 4. التشغيل
-```bash
-# تشغيل Backend
-npm run server
-
-# تشغيل Frontend (في terminal آخر)
-npm run dev
-
-# أو تشغيل الاثنين معاً
-npm run dev:all
-```
-
-## 🏗️ التقنيات المستخدمة
-
-### Frontend
-- **React 18** مع TypeScript
-- **Vite** للبناء والتطوير
-- **TailwindCSS** للتصميم
-- **shadcn/ui** للمكونات
-- **React Router** للتنقل
-- **Sonner** للإشعارات
-- **Lucide React** للأيقونات
-
-### Backend
-- **Node.js** مع Express
-- **TypeScript** للأمان والوضوح
-- **PostgreSQL** قاعدة البيانات الرئيسية
-- **Redis** للتخزين المؤقت
-- **JWT** للمصادقة
-- **bcrypt** لتشفير كلمات المرور
-- **AES-256** لتشفير البيانات الحساسة
-
-### DevOps & Deployment
-- **Railway** للاستضافة
-- **GitHub Actions** للـ CI/CD
-- **Docker** للحاويات
-- **Winston** للسجلات
+**منصة متكاملة لأتمتة التواصل على Twitter/X**
 
 ---
 
 ## ✨ الميزات
 
-### ✅ إدارة الحسابات
-- إضافة حسابات Twitter متعددة
-- تشفير AES-256 للكوكيز
-- التحقق التلقائي من صلاحية الحسابات
+- ✅ **إدارة حسابات Twitter متعددة** مع تشفير AES-256
+- ✅ **حملات الرسائل المباشرة** مع أتمتة كاملة
+- ✅ **حملات المتابعة** التلقائية
+- ✅ **استخراج المتابعين** من أي حساب
+- ✅ **نظام Pacing & Retry** لمنع الحظر
+- ✅ **نظام اشتراكات** (Free, Starter, Pro)
+- ✅ **لوحة تحكم للمدير**
 
-### ✅ إنشاء الحملات
-- استخراج المتابعين من أي حساب
-- قوالب رسائل مع متغيرات `{{name}}` و `{{username}}`
-- إدارة الأهداف (Targets)
+---
 
-### ✅ نظام Pacing & Limits محكم
-- **Messages per Minute**: تحديد عدد الرسائل في الدقيقة (يُحترم 100%)
-- **Delay Range**: تأخير عشوائي بين الرسائل (15-30 ثانية)
-- **Daily Cap**: حد يومي للرسائل
-- **Retry Attempts**: إعادة المحاولة عند الفشل (حتى 3 مرات)
+## 🚀 النشر السريع على Render
 
-### ✅ التحكم بالحملات
-- Start/Pause/Stop من صفحة القائمة مباشرة
-- تحديث تلقائي للإحصائيات كل 5 ثوانٍ
-- تتبع عدد المحاولات لكل هدف
-- Export CSV للأهداف
+### المتطلبات:
+- حساب GitHub
+- حساب Render (مجاني)
 
-### ✅ الأمان
-- JWT Authentication
-- bcrypt لتشفير كلمات المرور
-- AES-256 لتشفير الكوكيز
-- Rate limiting لتجنب الحظر
+### الخطوات:
 
-## 📁 هيكل المشروع
+1. **Fork المشروع** أو استخدمه مباشرة
+
+2. **اذهب إلى Render:** https://render.com
+
+3. **أنشئ Web Service:**
+   - New → Web Service
+   - Connect Repository: `codeestore20-maker/reachly-saas`
+   - Name: `reachly-saas`
+   - Build Command: `npm install && npm run build`
+   - Start Command: `npm start`
+
+4. **أضف PostgreSQL:**
+   - New → PostgreSQL
+   - Name: `reachly-postgres`
+
+5. **أضف Redis:**
+   - New → Redis (Key Value)
+   - Name: `reachly-redis`
+
+6. **أضف متغيرات البيئة:**
+   ```env
+   NODE_ENV=production
+   PORT=3001
+   JWT_SECRET=<generate-with-crypto>
+   COOKIE_ENCRYPTION_KEY=<generate-with-crypto>
+   DATABASE_URL=<from-postgres>
+   REDIS_URL=<from-redis>
+   ```
+
+7. **توليد المفاتيح:**
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+
+8. **أضف FRONTEND_URL** بعد أول نشر:
+   ```env
+   FRONTEND_URL=https://your-app.onrender.com
+   ```
+
+📖 **دليل مفصل:** [RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)
+
+---
+
+## 💻 التطوير المحلي
+
+### المتطلبات:
+- Node.js 18+
+- PostgreSQL 14+
+- Redis 6+
+
+### الخطوات:
+
+```bash
+# 1. استنساخ المشروع
+git clone https://github.com/codeestore20-maker/reachly-saas.git
+cd reachly-saas
+
+# 2. تثبيت المكتبات
+npm install
+
+# 3. إعداد البيئة
+cp .env.example .env.local
+# عدّل .env.local وأضف المفاتيح
+
+# 4. تشغيل التطبيق
+npm run dev:all
+```
+
+---
+
+## 📊 نظام الاشتراكات
+
+| الخطة | السعر | الحسابات | الرسائل/شهر | المتابعات/شهر |
+|-------|-------|----------|-------------|---------------|
+| **Free** | مجاني | 1 | 100 | 50 |
+| **Starter** | $29 | 3 | 1,000 | 500 |
+| **Pro** | $79 | 10 | 10,000 | 5,000 |
+
+---
+
+## 🏗️ البنية التقنية
+
+### Frontend:
+- React 18 + TypeScript
+- Vite
+- TailwindCSS + shadcn/ui
+- React Router
+- Tanstack Query
+
+### Backend:
+- Node.js + Express
+- TypeScript
+- PostgreSQL
+- Redis + Bull
+- JWT + bcrypt
+
+---
+
+## 🔐 الأمان
+
+- **AES-256** لتشفير كوكيز Twitter
+- **bcrypt** لتشفير كلمات المرور
+- **JWT** للمصادقة
+- **Rate Limiting** لمنع الإساءة
+- **HTTPS** إجباري
+
+---
+
+## 👤 حساب المدير الافتراضي
 
 ```
-reachly-wizard-reach/
-├── server/                 # Backend (Express + SQLite)
-│   ├── index.ts           # API endpoints
-│   ├── db.ts              # Database schema
-│   ├── auth.ts            # Authentication
-│   ├── twitter.ts         # Twitter API integration
-│   └── campaign-runner.ts # Campaign automation
-├── src/
-│   ├── pages/             # React pages
-│   ├── components/        # UI components
-│   └── lib/               # Utilities & API client
-├── docs/                  # Documentation
-└── migrate-add-retry-fields.js  # Database migration
+البريد: admin@reachly.com
+كلمة المرور: Balawi123
 ```
+
+**⚠️ غيّر كلمة المرور فوراً بعد أول تسجيل دخول!**
+
+---
 
 ## 📚 التوثيق
 
-- **[API Documentation](docs/API_DOCS.md)** - شرح جميع API endpoints
-- **[Pacing & Retry System](docs/PACING_AND_RETRY_SYSTEM.md)** - كيف يعمل نظام Pacing
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - حل المشاكل الشائعة
-- **[Roadmap](docs/ROADMAP.md)** - خطة التطوير المستقبلية
+- **[RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)** - دليل النشر الكامل
+- **[QUICK_START.md](QUICK_START.md)** - البدء السريع
+- **[README_AR.md](README_AR.md)** - الدليل بالعربية
+- **[docs/](docs/)** - التوثيق التقني
 
-## 🎯 الاستخدام
+---
 
-### 1. إضافة حساب Twitter
-1. اذهب إلى صفحة Accounts
-2. احصل على الكوكيز من Twitter (auth_token, ct0)
-3. أضف الحساب
+## ⚠️ تحذير قانوني
 
-### 2. إنشاء حملة
-1. اذهب إلى Campaigns → New Campaign
-2. اختر الحساب
-3. أضف الأهداف (يدوي أو استخراج متابعين)
-4. اكتب الرسالة
-5. حدد إعدادات Pacing
-6. أنشئ الحملة
+هذا المشروع للأغراض التعليمية فقط. استخدام أتمتة Twitter قد يخالف شروط الخدمة. استخدمه على مسؤوليتك الخاصة.
 
-### 3. تشغيل الحملة
-1. اضغط Start من صفحة Campaigns
-2. راقب التقدم في Dashboard
-3. يمكنك Pause أو Stop في أي وقت
-
-## ⚙️ إعدادات Pacing الموصى بها
-
-### للحسابات الجديدة
-```
-Messages per Minute: 2
-Min Delay: 20 seconds
-Max Delay: 40 seconds
-Daily Cap: 30
-Retry Attempts: 2
-```
-
-### للحسابات المعتمدة
-```
-Messages per Minute: 3
-Min Delay: 15 seconds
-Max Delay: 30 seconds
-Daily Cap: 50
-Retry Attempts: 3
-```
-
-## 🐛 المشاكل الشائعة
-
-### "Failed to decrypt data"
-قم بتشغيل:
-```bash
-npm run reset-db
-```
-ثم أعد إضافة حساباتك.
-
-### "No followers found"
-تأكد من:
-- صلاحية الكوكيز
-- أن الحساب المستهدف عام (ليس خاص)
-
-## 📝 ملاحظات مهمة
-
-- ⚠️ لا تغير `COOKIE_ENCRYPTION_KEY` بعد إضافة حسابات
-- ⚠️ احتفظ بنسخة احتياطية من `.env.local`
-- ⚠️ استخدم إعدادات Pacing آمنة لتجنب الحظر
-- ⚠️ هذا المشروع للأغراض التعليمية فقط
-
-## 🔄 التحديثات الأخيرة
-
-### v1.3.0 (يناير 2025)
-- ✅ أزرار Start/Pause/Stop في صفحة Campaigns
-- ✅ عرض retry_count و last_attempt_at
-- ✅ Real-time updates كل 5 ثوانٍ
-- ✅ Export CSV للأهداف
-
-### v1.2.0
-- ✅ نظام Retry كامل
-- ✅ منع إرسال رسائل مكررة
-- ✅ تتبع عدد المحاولات
-
-### v1.1.0
-- ✅ إصلاح نظام Pacing & Limits
-- ✅ Messages per Minute يعمل بدقة
-- ✅ Processing Lock لمنع التزامن
+---
 
 ## 📄 الترخيص
 
 MIT License - استخدم المشروع بحرية للتعلم والتطوير.
+
+---
+
+## 🔗 الروابط
+
+- **GitHub:** https://github.com/codeestore20-maker/reachly-saas
+- **Live Demo:** https://reachly-saas.onrender.com
+- **Issues:** https://github.com/codeestore20-maker/reachly-saas/issues
+
+---
+
+**© 2025 Reachly Team. جميع الحقوق محفوظة.**
