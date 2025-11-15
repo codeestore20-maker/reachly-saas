@@ -231,7 +231,7 @@ async function getUserId(username: string, cookies: TwitterCookies): Promise<str
   return userId;
 }
 
-// إرسال رسالة مباشرة (Updated to use correct DM endpoint)
+// إرسال رسالة مباشرة (Updated to use GraphQL conversation endpoint)
 export async function sendDM(
   encryptedCookies: string,
   recipientUsername: string,
@@ -244,16 +244,24 @@ export async function sendDM(
     // البحث عن user ID
     const userId = await getUserId(recipientUsername, cookies);
     
-    // إرسال الرسالة عبر REST API v1.1 - استخدام endpoint الصحيح
+    // استخدام GraphQL endpoint الحديث لإرسال الرسائل
+    const requestBody = {
+      conversation_id: userId,
+      recipient_ids: false,
+      request_id: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      text: message,
+      cards_platform: 'Web-12',
+      include_cards: 1,
+      include_quote_count: true,
+      dm_users: false
+    };
+
     const response = await fetch(
-      'https://x.com/i/api/1.1/dm/new.json',
+      'https://x.com/i/api/1.1/dm/conversation/create.json',
       {
         method: 'POST',
         headers: createBrowserHeaders(cookies, 'application/x-www-form-urlencoded'),
-        body: new URLSearchParams({
-          'recipient_id': userId,
-          'text': message
-        }).toString()
+        body: new URLSearchParams(requestBody as Record<string, string>).toString()
       }
     );
 
