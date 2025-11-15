@@ -232,12 +232,15 @@ async function processCampaign(campaignId: number) {
         const friendlyError = isPermanentError 
           ? 'User privacy settings prevent receiving messages from non-followers'
           : result.error || 'Unknown error';
+        
+        // Use 'skipped' status for permanent errors to prevent retries
+        const finalStatus = isPermanentError ? 'skipped' : 'failed';
           
         await query(`
           UPDATE targets
-          SET status = 'failed', error_message = $1, updated_at = CURRENT_TIMESTAMP
-          WHERE id = $2
-        `, [friendlyError, target.id]);
+          SET status = $1, error_message = $2, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $3
+        `, [finalStatus, friendlyError, target.id]);
 
         await query(`
           UPDATE campaigns
