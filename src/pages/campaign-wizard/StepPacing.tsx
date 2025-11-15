@@ -21,7 +21,9 @@ export const StepPacing = ({ draft, updateDraft, onNext, onBack }: Props) => {
     });
   };
 
-  const showHighPacingWarning = draft.pacing.perMinute > 5 || draft.pacing.dailyCap > 100;
+  const avgDelay = (draft.pacing.delayMin + draft.pacing.delayMax) / 2;
+  const estimatedDailyCap = Math.floor(86400 / avgDelay);
+  const showHighPacingWarning = draft.pacing.perMinute > 20 || avgDelay < 10;
 
   return (
     <div className="space-y-6">
@@ -38,12 +40,12 @@ export const StepPacing = ({ draft, updateDraft, onNext, onBack }: Props) => {
               <Slider
                 value={[draft.pacing.perMinute]}
                 onValueChange={([value]) => updatePacing('perMinute', value)}
-                min={1}
-                max={10}
+                min={10}
+                max={30}
                 step={1}
               />
               <p className="text-xs text-muted-foreground">
-                Recommended: 2-4 messages per minute
+                Recommended: 15-20 messages per minute
               </p>
             </div>
 
@@ -77,30 +79,16 @@ export const StepPacing = ({ draft, updateDraft, onNext, onBack }: Props) => {
           </div>
 
           <div className="space-y-2">
-            <Label>Daily Message Cap: {draft.pacing.dailyCap}</Label>
-            <Slider
-              value={[draft.pacing.dailyCap]}
-              onValueChange={([value]) => updatePacing('dailyCap', value)}
-              min={10}
-              max={200}
-              step={10}
-            />
-            <p className="text-xs text-muted-foreground">
-              Recommended: 30-60 messages per day
-            </p>
-          </div>
-
-          <div className="space-y-2">
             <Label>Retry Attempts: {draft.pacing.retryAttempts}</Label>
             <Slider
               value={[draft.pacing.retryAttempts]}
               onValueChange={([value]) => updatePacing('retryAttempts', value)}
               min={0}
-              max={5}
+              max={2}
               step={1}
             />
             <p className="text-xs text-muted-foreground">
-              Number of retry attempts for failed messages
+              Number of retry attempts for failed messages (0 = no retries)
             </p>
           </div>
         </div>
@@ -110,15 +98,21 @@ export const StepPacing = ({ draft, updateDraft, onNext, onBack }: Props) => {
             <h3 className="mb-4 font-semibold text-foreground">Estimated Timeline</h3>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
+                <span className="text-muted-foreground">Messages per minute:</span>
+                <span className="font-medium text-foreground">
+                  {draft.pacing.perMinute}
+                </span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Messages per hour:</span>
                 <span className="font-medium text-foreground">
                   ~{draft.pacing.perMinute * 60}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Daily capacity:</span>
+                <span className="text-muted-foreground">Estimated daily capacity:</span>
                 <span className="font-medium text-foreground">
-                  {draft.pacing.dailyCap} messages
+                  ~{Math.floor((86400 / ((draft.pacing.delayMin + draft.pacing.delayMax) / 2)))} messages
                 </span>
               </div>
               <div className="flex justify-between">
@@ -143,10 +137,10 @@ export const StepPacing = ({ draft, updateDraft, onNext, onBack }: Props) => {
           <Card className="border-primary bg-primary/10 p-4">
             <h4 className="mb-2 text-sm font-semibold text-foreground">🛡️ Safety Recommendations</h4>
             <ul className="space-y-1 text-xs text-muted-foreground">
-              <li>• Start with conservative limits</li>
-              <li>• Add random delays between messages</li>
-              <li>• Stay under 60 messages per day initially</li>
-              <li>• Monitor for delivery issues</li>
+              <li>• Start with 15 messages/min and 15-30s delays</li>
+              <li>• Random delays make sending appear natural</li>
+              <li>• Monitor for rate limit errors</li>
+              <li>• Adjust based on account age and reputation</li>
             </ul>
           </Card>
         </div>

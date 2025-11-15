@@ -326,12 +326,16 @@ app.post('/api/campaigns', authMiddleware, checkLimit('create_dm_campaign'), asy
     
     // Default pacing values if not provided
     const pacingSettings = {
-      perMinute: pacing?.perMinute || 3,
+      perMinute: pacing?.perMinute || 15,
       delayMin: pacing?.delayMin || 15,
       delayMax: pacing?.delayMax || 30,
-      dailyCap: pacing?.dailyCap || 50,
-      retryAttempts: pacing?.retryAttempts || 2
+      retryAttempts: pacing?.retryAttempts ?? 0
     };
+    
+    // Calculate daily cap automatically based on delays
+    // 86400 seconds in a day / average delay = max messages per day
+    const avgDelay = (pacingSettings.delayMin + pacingSettings.delayMax) / 2;
+    const calculatedDailyCap = Math.floor(86400 / avgDelay);
     
     // Set status based on isDraft flag
     const status = isDraft ? 'draft' : 'pending';
@@ -342,7 +346,7 @@ app.post('/api/campaigns', authMiddleware, checkLimit('create_dm_campaign'), asy
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id
     `, [req.user.id, accountId, name, status, targetSource, message, tags ? JSON.stringify(tags) : null,
         pacingSettings.perMinute, pacingSettings.delayMin, pacingSettings.delayMax, 
-        pacingSettings.dailyCap, pacingSettings.retryAttempts]);
+        calculatedDailyCap, pacingSettings.retryAttempts]);
     
     const campaignId = result.rows[0].id;
     let targets: any[] = [];
@@ -417,12 +421,15 @@ app.put('/api/campaigns/:id', authMiddleware, async (req: any, res) => {
     if (!campaignCheck.rows[0]) return res.status(404).json({ error: 'Campaign not found' });
     
     const pacingSettings = {
-      perMinute: pacing?.perMinute || 3,
+      perMinute: pacing?.perMinute || 15,
       delayMin: pacing?.delayMin || 15,
       delayMax: pacing?.delayMax || 30,
-      dailyCap: pacing?.dailyCap || 50,
-      retryAttempts: pacing?.retryAttempts || 2
+      retryAttempts: pacing?.retryAttempts ?? 0
     };
+    
+    // Calculate daily cap automatically
+    const avgDelay = (pacingSettings.delayMin + pacingSettings.delayMax) / 2;
+    const calculatedDailyCap = Math.floor(86400 / avgDelay);
     
     await query(`
       UPDATE campaigns SET 
@@ -432,7 +439,7 @@ app.put('/api/campaigns/:id', authMiddleware, async (req: any, res) => {
       WHERE id = $11 AND user_id = $12
     `, [name, accountId, tags ? JSON.stringify(tags) : null, targetSource, message,
         pacingSettings.perMinute, pacingSettings.delayMin, pacingSettings.delayMax,
-        pacingSettings.dailyCap, pacingSettings.retryAttempts, req.params.id, req.user.id]);
+        calculatedDailyCap, pacingSettings.retryAttempts, req.params.id, req.user.id]);
     
     // Update targets if provided
     if (targetSource === 'manual' && manualTargets) {

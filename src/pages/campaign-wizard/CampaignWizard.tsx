@@ -55,11 +55,10 @@ export default function CampaignWizard() {
     selectedFollowers: [],
     message: '',
     pacing: {
-      perMinute: 3,
+      perMinute: 15,
       delayMin: 15,
       delayMax: 30,
-      dailyCap: 50,
-      retryAttempts: 2,
+      retryAttempts: 0,
     },
   });
 
@@ -103,10 +102,9 @@ export default function CampaignWizard() {
         selectedFollowers: campaign.targets || [],
         message: campaign.message_template || '',
         pacing: {
-          perMinute: campaign.pacing_per_minute || 3,
+          perMinute: campaign.pacing_per_minute || 15,
           delayMin: campaign.pacing_delay_min || 15,
           delayMax: campaign.pacing_delay_max || 30,
-          dailyCap: campaign.pacing_daily_cap || 50,
           retryAttempts: campaign.pacing_retry_attempts ?? 0,
         },
       });

@@ -244,11 +244,11 @@ export async function initializeDatabase(): Promise<void> {
         target_source VARCHAR(50) NOT NULL,
         message_template TEXT NOT NULL,
         tags TEXT,
-        pacing_per_minute INTEGER DEFAULT 3,
+        pacing_per_minute INTEGER DEFAULT 15,
         pacing_delay_min INTEGER DEFAULT 15,
         pacing_delay_max INTEGER DEFAULT 30,
-        pacing_daily_cap INTEGER DEFAULT 50,
-        pacing_retry_attempts INTEGER DEFAULT 2,
+        pacing_daily_cap INTEGER DEFAULT 3840,
+        pacing_retry_attempts INTEGER DEFAULT 0,
         stats_total INTEGER DEFAULT 0,
         stats_sent INTEGER DEFAULT 0,
         stats_failed INTEGER DEFAULT 0,
@@ -282,18 +282,28 @@ export async function initializeDatabase(): Promise<void> {
       logger.warn('Targets updated_at column migration skipped');
     }
     
-    // Change default retry attempts from 2 to 0 (migration)
+    // Update pacing defaults (migration v2.1)
     try {
+      // Update defaults
+      await query(`ALTER TABLE campaigns ALTER COLUMN pacing_per_minute SET DEFAULT 15`);
+      await query(`ALTER TABLE campaigns ALTER COLUMN pacing_daily_cap SET DEFAULT 3840`);
       await query(`ALTER TABLE campaigns ALTER COLUMN pacing_retry_attempts SET DEFAULT 0`);
       await query(`ALTER TABLE follow_campaigns ALTER COLUMN pacing_retry_attempts SET DEFAULT 0`);
       
-      // Update existing campaigns that have the old default value of 2
+      // Update existing campaigns with old defaults
       const result1 = await query(`UPDATE campaigns SET pacing_retry_attempts = 0 WHERE pacing_retry_attempts = 2`);
       const result2 = await query(`UPDATE follow_campaigns SET pacing_retry_attempts = 0 WHERE pacing_retry_attempts = 2`);
       
-      logger.info(`✓ Updated pacing_retry_attempts: ${result1.rowCount} campaigns, ${result2.rowCount} follow campaigns`);
+      // Recalculate daily cap for existing campaigns based on their delays
+      await query(`
+        UPDATE campaigns 
+        SET pacing_daily_cap = FLOOR(86400.0 / ((pacing_delay_min + pacing_delay_max) / 2.0))
+        WHERE pacing_daily_cap < 100 OR pacing_daily_cap = 50
+      `);
+      
+      logger.info(`✓ Updated pacing settings: ${result1.rowCount} campaigns, ${result2.rowCount} follow campaigns`);
     } catch (error) {
-      logger.warn('Retry attempts migration skipped');
+      logger.warn('Pacing migration skipped');
     }
 
     await query(`
