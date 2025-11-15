@@ -229,11 +229,15 @@ async function processCampaign(campaignId: number) {
       
       if (attemptNumber >= maxAttempts || isPermanentError) {
         // No more retries allowed - mark as permanently failed
+        const friendlyError = isPermanentError 
+          ? 'User privacy settings prevent receiving messages from non-followers'
+          : result.error || 'Unknown error';
+          
         await query(`
           UPDATE targets
           SET status = 'failed', error_message = $1, updated_at = CURRENT_TIMESTAMP
           WHERE id = $2
-        `, [result.error || 'Unknown error', target.id]);
+        `, [friendlyError, target.id]);
 
         await query(`
           UPDATE campaigns
