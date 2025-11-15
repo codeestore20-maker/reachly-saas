@@ -8,13 +8,36 @@ export interface TwitterCookies {
 
 const BEARER_TOKEN = 'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 
-// Working Query IDs (Updated November 15, 2024 - Extracted from live Twitter)
+// Working Query IDs (Updated November 15, 2025 - Extracted from live Twitter)
 const WORKING_QUERY_IDS = {
-  UserByScreenName: 'ZHSN3WlvahPKVvUxVQbg1A', // ✅ WORKING (Nov 15, 2024)
+  UserByScreenName: 'ZHSN3WlvahPKVvUxVQbg1A', // ✅ WORKING (Nov 15, 2025)
   Followers: 'OGScL-RC4DFMsRGOCjPR6g',
   Following: 'o5eNLkJb03ayTQa97Cpp7w',
   UserMedia: 'ophTtKkfXcUKnXlxh9fU5w',
 };
+
+// Helper function to create browser-like headers
+function createBrowserHeaders(cookies: TwitterCookies, contentType: string = 'application/json'): Record<string, string> {
+  return {
+    'authorization': `Bearer ${BEARER_TOKEN}`,
+    'cookie': `auth_token=${cookies.auth_token}; ct0=${cookies.ct0}`,
+    'x-csrf-token': cookies.ct0,
+    'x-twitter-auth-type': 'OAuth2Session',
+    'x-twitter-active-user': 'yes',
+    'x-twitter-client-language': 'en',
+    'content-type': contentType,
+    'accept': '*/*',
+    'accept-language': 'en-US,en;q=0.9',
+    'referer': 'https://x.com/',
+    'sec-ch-ua': '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-origin',
+    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+  };
+}
 
 // تحليل الكوكيز من صيغ مختلفة
 export function parseCookies(input: string): TwitterCookies {
@@ -91,14 +114,7 @@ export async function validateTwitterAccount(
     )}`;
 
     const response = await fetch(url, {
-      headers: {
-        'authorization': `Bearer ${BEARER_TOKEN}`,
-        'cookie': `auth_token=${cookies.auth_token}; ct0=${cookies.ct0}`,
-        'x-csrf-token': cookies.ct0,
-        'x-twitter-auth-type': 'OAuth2Session',
-        'x-twitter-active-user': 'yes',
-        'content-type': 'application/json',
-      }
+      headers: createBrowserHeaders(cookies)
     });
 
     console.log(`Response status: ${response.status}`);
@@ -170,14 +186,7 @@ async function getUserId(username: string, cookies: TwitterCookies): Promise<str
   )}`;
 
   const response = await fetch(url, {
-    headers: {
-      'authorization': `Bearer ${BEARER_TOKEN}`,
-      'cookie': `auth_token=${cookies.auth_token}; ct0=${cookies.ct0}`,
-      'x-csrf-token': cookies.ct0,
-      'x-twitter-auth-type': 'OAuth2Session',
-      'x-twitter-active-user': 'yes',
-      'content-type': 'application/json',
-    }
+    headers: createBrowserHeaders(cookies)
   });
 
   console.log('getUserId response status:', response.status);
@@ -217,15 +226,7 @@ export async function sendDM(
       'https://x.com/i/api/1.1/dm/welcome_messages/add_to_conversation.json',
       {
         method: 'POST',
-        headers: {
-          'authorization': `Bearer ${BEARER_TOKEN}`,
-          'cookie': `auth_token=${cookies.auth_token}; ct0=${cookies.ct0}`,
-          'x-csrf-token': cookies.ct0,
-          'x-twitter-auth-type': 'OAuth2Session',
-          'x-twitter-active-user': 'yes',
-          'x-twitter-client-language': 'en',
-          'content-type': 'application/x-www-form-urlencoded',
-        },
+        headers: createBrowserHeaders(cookies, 'application/x-www-form-urlencoded'),
         body: new URLSearchParams({
           'recipient_id': userId,
           'text': message,
@@ -267,7 +268,7 @@ export async function extractFollowers(
     const userId = await getUserId(targetUsername, cookies);
     console.log('✓ Got user ID:', userId);
     
-    const followers: any[] = [];
+    const followers: unknown[] = [];
     let cursor: string = '-1';
     let attempts = 0;
     const maxAttempts = Math.ceil(count / 50) + 2; // عدد كافي من المحاولات
@@ -284,13 +285,7 @@ export async function extractFollowers(
       const url = `https://api.twitter.com/1.1/followers/list.json?user_id=${userId}&count=${requestCount}&cursor=${cursor}&skip_status=true&include_user_entities=false`;
       
       const response = await fetch(url, {
-        headers: {
-          'authorization': `Bearer ${BEARER_TOKEN}`,
-          'cookie': `auth_token=${cookies.auth_token}; ct0=${cookies.ct0}`,
-          'x-csrf-token': cookies.ct0,
-          'x-twitter-auth-type': 'OAuth2Session',
-          'x-twitter-active-user': 'yes',
-        }
+        headers: createBrowserHeaders(cookies)
       });
       
       console.log('Response status:', response.status);
@@ -380,13 +375,7 @@ async function extractFollowersGraphQL(
     )}`;
     
   const response = await fetch(url, {
-    headers: {
-      'authorization': `Bearer ${BEARER_TOKEN}`,
-      'cookie': `auth_token=${cookies.auth_token}; ct0=${cookies.ct0}`,
-      'x-csrf-token': cookies.ct0,
-      'x-twitter-auth-type': 'OAuth2Session',
-      'x-twitter-active-user': 'yes',
-    }
+    headers: createBrowserHeaders(cookies)
   });
   
   if (!response.ok) {
@@ -442,15 +431,7 @@ export async function followUser(
       'https://x.com/i/api/1.1/friendships/create.json',
       {
         method: 'POST',
-        headers: {
-          'authorization': `Bearer ${BEARER_TOKEN}`,
-          'cookie': `auth_token=${cookies.auth_token}; ct0=${cookies.ct0}`,
-          'x-csrf-token': cookies.ct0,
-          'x-twitter-auth-type': 'OAuth2Session',
-          'x-twitter-active-user': 'yes',
-          'x-twitter-client-language': 'en',
-          'content-type': 'application/x-www-form-urlencoded',
-        },
+        headers: createBrowserHeaders(cookies, 'application/x-www-form-urlencoded'),
         body: new URLSearchParams({
           'user_id': userId
         }).toString()
