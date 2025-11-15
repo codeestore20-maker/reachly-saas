@@ -231,7 +231,7 @@ async function getUserId(username: string, cookies: TwitterCookies): Promise<str
   return userId;
 }
 
-// إرسال رسالة مباشرة (Using GraphQL endpoint)
+// إرسال رسالة مباشرة (Using REST API v1.1 like followUser)
 export async function sendDM(
   encryptedCookies: string,
   recipientUsername: string,
@@ -244,27 +244,24 @@ export async function sendDM(
     // البحث عن user ID
     const userId = await getUserId(recipientUsername, cookies);
     
-    // استخدام GraphQL endpoint لإرسال الرسائل المباشرة
-    const queryId = 'rOnvUbWf-Sq7CzEHnRWRVw'; // DM mutation Query ID
-    
-    const variables = {
-      message: {
-        text: {
-          text: message
-        }
-      },
-      conversationId: userId,
-      requestId: `${Date.now()}-${Math.random().toString(36).substring(7)}`
-    };
-
+    // إرسال الرسالة عبر REST API v1.1 (نفس طريقة followUser التي تعمل بشكل مثالي)
     const response = await fetch(
-      `https://x.com/i/api/graphql/${queryId}/useSendMessageMutation`,
+      'https://x.com/i/api/1.1/direct_messages/events/new.json',
       {
         method: 'POST',
         headers: createBrowserHeaders(cookies, 'application/json'),
         body: JSON.stringify({
-          variables,
-          queryId
+          event: {
+            type: 'message_create',
+            message_create: {
+              target: {
+                recipient_id: userId
+              },
+              message_data: {
+                text: message
+              }
+            }
+          }
         })
       }
     );
