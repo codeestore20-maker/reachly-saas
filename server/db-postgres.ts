@@ -270,9 +270,17 @@ export async function initializeDatabase(): Promise<void> {
         last_attempt_at TIMESTAMP,
         sent_at TIMESTAMP,
         error_message TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    
+    // Add updated_at column if it doesn't exist (migration)
+    try {
+      await query(`ALTER TABLE targets ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
+    } catch (error) {
+      logger.warn('Targets updated_at column migration skipped');
+    }
 
     await query(`
       CREATE TABLE IF NOT EXISTS follow_campaigns (
@@ -308,9 +316,17 @@ export async function initializeDatabase(): Promise<void> {
         last_attempt_at TIMESTAMP,
         followed_at TIMESTAMP,
         error_message TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    
+    // Add updated_at column if it doesn't exist (migration)
+    try {
+      await query(`ALTER TABLE follow_targets ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
+    } catch (error) {
+      logger.warn('Follow_targets updated_at column migration skipped');
+    }
 
     await query(`
       CREATE TABLE IF NOT EXISTS followers (

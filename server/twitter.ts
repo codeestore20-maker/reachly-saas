@@ -258,16 +258,22 @@ export async function sendDM(
       }
     );
 
+    console.log('Send DM response status:', response.status);
+    
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Send DM error:', errorText);
+      console.error('Send DM error - Status:', response.status);
+      console.error('Send DM error - Body:', errorText || '(empty response)');
+      console.error('Send DM error - Headers:', JSON.stringify([...response.headers.entries()]));
       return { 
         success: false, 
-        error: `HTTP ${response.status}: ${errorText.substring(0, 100)}` 
+        error: `HTTP ${response.status}: ${errorText || 'Empty response'}` 
       };
     }
 
+    const responseData = await response.text();
     console.log('✓ DM sent successfully to', recipientUsername);
+    console.log('Response:', responseData.substring(0, 200));
     return { success: true };
   } catch (error) {
     console.error('Send DM exception:', error);
