@@ -21,6 +21,11 @@ dist-ssr
 .env.local
 .env.production
 
+# Backups
+*.tar.gz
+*.zip
+*.backup
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

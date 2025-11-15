@@ -1,0 +1,40 @@
+services:
+  # Web Service (Backend + Frontend)
+  - type: web
+    name: reachly-saas
+    env: node
+    region: frankfurt
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_ENCRYPTION_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: reachly-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromDatabase:
+          name: reachly-redis
+          property: connectionString
+
+databases:
+  # PostgreSQL Database
+  - name: reachly-postgres
+    databaseName: reachly
+    plan: free
+    region: frankfurt
+
+  # Redis Instance
+  - name: reachly-redis
+    plan: free
+    region: frankfurt
+    maxmemoryPolicy: noeviction

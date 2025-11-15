@@ -7,55 +7,59 @@
 
 ---
 
-## 🚀 خطوات النشر على Railway (5 دقائق)
+## 🚀 خطوات النشر على Render (5 دقائق)
 
-### 1️⃣ إنشاء حساب Railway
-- اذهب إلى: https://railway.app
-- سجل دخول بحساب GitHub
+### 1️⃣ إنشاء حساب Render
+- اذهب إلى: https://render.com
+- سجل دخول بحساب GitHub (مجاني 100%)
 
-### 2️⃣ إنشاء مشروع جديد
-1. اضغط **"New Project"**
-2. اختر **"Deploy from GitHub repo"**
-3. اختر: `codeestore20-maker/reachly-saas`
+### 2️⃣ إنشاء Web Service
+1. اختر **"Web Services"**
+2. اضغط **"New Web Service"**
+3. اختر مستودع: `codeestore20-maker/reachly-saas`
+4. املأ الإعدادات (راجع RENDER_DEPLOYMENT.md)
 
 ### 3️⃣ إضافة PostgreSQL
-1. في المشروع، اضغط **"+ New"**
-2. اختر **"Database"** → **"PostgreSQL"**
-3. ✅ سيتم إنشاء `DATABASE_URL` تلقائياً
+1. من Dashboard، اضغط **"New +"**
+2. اختر **"PostgreSQL"**
+3. Name: `reachly-postgres`
+4. ✅ سيتم إنشاء قاعدة البيانات
 
 ### 4️⃣ إضافة Redis
-1. اضغط **"+ New"** مرة أخرى
-2. اختر **"Database"** → **"Redis"**
-3. ✅ سيتم إنشاء `REDIS_URL` تلقائياً
+1. من Dashboard، اضغط **"New +"**
+2. اختر **"Redis"**
+3. Name: `reachly-redis`
+4. ✅ سيتم إنشاء Redis
 
-### 5️⃣ إضافة متغيرات البيئة
+### 5️⃣ ربط القواعد والمتغيرات
 
-في إعدادات المشروع (Settings → Variables)، أضف:
+في Web Service → Environment:
 
-```env
-NODE_ENV=production
-PORT=3001
-JWT_SECRET=f315ca56853c988d2b46e8b903ccf243e120d93aa1614814e2b1b699fb52d446
-COOKIE_ENCRYPTION_KEY=07c948ca953ecfe43d5ca2e086ebd816546232c8b1ab069030771c962e411e47
-```
+1. أضف `DATABASE_URL` من `reachly-postgres`
+2. أضف `REDIS_URL` من `reachly-redis`
+3. ولّد وأضف `JWT_SECRET`:
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+4. ولّد وأضف `COOKIE_ENCRYPTION_KEY`:
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
 
-**⚠️ مهم:** استخدم المفاتيح أعلاه أو ولّد مفاتيح جديدة بالأمر:
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
+**⚠️ احفظ المفاتيح في مكان آمن!**
 
 ### 6️⃣ إضافة FRONTEND_URL (بعد أول نشر)
 
-1. انسخ رابط التطبيق من Railway
+1. انسخ رابط التطبيق من Render
 2. أضف متغير جديد:
    ```
-   FRONTEND_URL=https://your-app-url.railway.app
+   FRONTEND_URL=https://your-app.onrender.com
    ```
-3. اضغط **"Redeploy"**
+3. احفظ (سيعيد النشر تلقائياً)
 
 ### 7️⃣ التحقق من النشر ✅
 
-افتح: `https://your-app-url.railway.app/health`
+افتح: `https://your-app.onrender.com/health`
 
 يجب أن ترى:
 ```json

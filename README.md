@@ -2,7 +2,7 @@
 
 **منصة أتمتة التواصل على Twitter** - نظام شامل لإدارة حملات الرسائل المباشرة والمتابعة مع أتمتة كاملة ونظام Pacing & Retry محكم.
 
-[![Deploy Status](https://img.shields.io/badge/Deploy-Railway-success)](https://railway.app)
+[![Deploy Status](https://img.shields.io/badge/Deploy-Render-success)](https://render.com)
 [![Tech Stack](https://img.shields.io/badge/Stack-React%20%2B%20Node.js-blue)](#)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL-blue)](#)
 [![Cache](https://img.shields.io/badge/Cache-Redis-red)](#)
