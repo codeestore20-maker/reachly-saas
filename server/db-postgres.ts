@@ -70,8 +70,18 @@ function getEncryptionKey(): string {
   return newKey;
 }
 
+/**
+ * Get old encryption keys for backward compatibility
+ * Allows decrypting data encrypted with previous keys
+ */
+function getOldEncryptionKeys(): string[] {
+  const oldKeys = process.env.OLD_ENCRYPTION_KEYS || '';
+  return oldKeys.split(',').filter(k => k.length === 64);
+}
+
 // الحصول على مفتاح التشفير الثابت
 const ENCRYPTION_KEY = getEncryptionKey();
+const OLD_KEYS = getOldEncryptionKeys();
 
 // Validate encryption key
 if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
@@ -81,10 +91,16 @@ if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
 }
 
 logger.info(`🔑 Encryption key loaded: ${ENCRYPTION_KEY.substring(0, 8)}...`);
+if (OLD_KEYS.length > 0) {
+  logger.info(`🔑 ${OLD_KEYS.length} old encryption key(s) available for backward compatibility`);
+}
 
 let key: Buffer;
+let oldKeyBuffers: Buffer[] = [];
+
 try {
   key = Buffer.from(ENCRYPTION_KEY, 'hex');
+  oldKeyBuffers = OLD_KEYS.map(k => Buffer.from(k, 'hex'));
 } catch (error) {
   logger.error('❌ Failed to create key buffer', { error });
   throw error;
@@ -99,23 +115,41 @@ export function encrypt(text: string): string {
 }
 
 export function decrypt(text: string): string {
+  const parts = text.split(':');
+  if (parts.length !== 2) {
+    throw new Error('Invalid encrypted data format');
+  }
+  
+  const iv = Buffer.from(parts[0], 'hex');
+  const encryptedText = parts[1];
+  
+  // Try with current key first
   try {
-    const parts = text.split(':');
-    if (parts.length !== 2) {
-      throw new Error('Invalid encrypted data format');
-    }
-    const iv = Buffer.from(parts[0], 'hex');
-    const encryptedText = parts[1];
     const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
     let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
   } catch (error) {
-    logger.error('❌ Decryption error', { error });
+    // If current key fails, try old keys (backward compatibility)
+    for (let i = 0; i < oldKeyBuffers.length; i++) {
+      try {
+        const decipher = crypto.createDecipheriv('aes-256-cbc', oldKeyBuffers[i], iv);
+        let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        logger.warn(`⚠️  Decrypted with old key #${i + 1}. Consider re-encrypting this data.`);
+        return decrypted;
+      } catch (oldKeyError) {
+        // Continue to next key
+      }
+    }
+    
+    // All keys failed
+    logger.error('❌ Decryption failed with all available keys');
     logger.error('⚠️  This usually happens when:');
     logger.error('   1. COOKIE_ENCRYPTION_KEY changed in environment');
     logger.error('   2. Database was created with a different encryption key');
     logger.error('   3. Encrypted data is corrupted');
+    logger.error('   4. OLD_ENCRYPTION_KEYS not set for backward compatibility');
     throw new Error('Failed to decrypt data. The encryption key may have changed. Please re-add your accounts.');
   }
 }
