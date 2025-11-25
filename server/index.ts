@@ -28,6 +28,36 @@ import {
   getAllUsersWithSubscriptions,
   getSystemStats
 } from './subscription';
+
+// ============ Helper Functions for Settings Normalization ============
+
+/**
+ * Normalize follow campaign settings from various input formats
+ * Accepts both 'settings' (from UI) and 'pacing' (legacy) formats
+ */
+function normalizeFollowSettings(input: any) {
+  const source = input.settings || input.pacing || {};
+  
+  return {
+    perMinute: source.followsPerMinute || source.perMinute || 3,
+    dailyCap: source.dailyCap || 50,
+    delayMin: source.randomDelay !== false ? 15 : 20,  // If randomDelay enabled or undefined, use 15
+    delayMax: source.randomDelay !== false ? 30 : 20,  // If randomDelay enabled or undefined, use 30
+    retryAttempts: source.retryAttempts || 2
+  };
+}
+
+/**
+ * Format campaign settings from database to UI format
+ */
+function formatFollowSettings(campaign: any) {
+  return {
+    followsPerMinute: campaign.pacing_per_minute || 0,
+    dailyCap: campaign.pacing_daily_cap || 0,
+    randomDelay: campaign.pacing_delay_min !== campaign.pacing_delay_max,
+    autoPauseOnHighFailure: false  // Not implemented yet
+  };
+}
 import logger from './logger';
 
 dotenv.config({ path: '.env.local' });
@@ -494,8 +524,17 @@ app.get('/api/follow-campaigns/:id', authMiddleware, async (req: any, res) => {
     
     if (!campaignResult.rows[0]) return res.status(404).json({ error: 'Follow campaign not found' });
     
+    const campaign = campaignResult.rows[0];
     const targetsResult = await query('SELECT * FROM follow_targets WHERE campaign_id = $1 ORDER BY updated_at DESC NULLS LAST, created_at ASC', [req.params.id]);
-    res.json({ ...campaignResult.rows[0], targets: targetsResult.rows });
+    
+    // Format settings for UI
+    const formattedCampaign = {
+      ...campaign,
+      settings: formatFollowSettings(campaign),
+      targets: targetsResult.rows
+    };
+    
+    res.json(formattedCampaign);
   } catch (error) {
     logger.error('Get follow campaign error', { error });
     res.status(500).json({ error: (error as Error).message });
@@ -504,17 +543,11 @@ app.get('/api/follow-campaigns/:id', authMiddleware, async (req: any, res) => {
 
 app.post('/api/follow-campaigns', authMiddleware, checkLimit('create_follow_campaign'), async (req: any, res) => {
   try {
-    const { name, accountId, targetSource, manualTargets, selectedFollowers, pacing, isDraft } = req.body;
+    const { name, accountId, targetSource, manualTargets, selectedFollowers, isDraft } = req.body;
     if (!name || !accountId) return res.status(400).json({ error: 'Missing required fields' });
     
-    // Default pacing values if not provided
-    const pacingSettings = {
-      perMinute: pacing?.perMinute || 3,
-      delayMin: pacing?.delayMin || 15,
-      delayMax: pacing?.delayMax || 30,
-      dailyCap: pacing?.dailyCap || 50,
-      retryAttempts: pacing?.retryAttempts || 2
-    };
+    // Normalize settings from UI format (supports both 'settings' and 'pacing')
+    const pacingSettings = normalizeFollowSettings(req.body);
     
     // Set status based on isDraft flag
     const status = isDraft ? 'draft' : 'pending';
@@ -594,18 +627,13 @@ app.post('/api/follow-campaigns/:id/stop', authMiddleware, (req: any, res) => {
 // Update follow campaign draft
 app.put('/api/follow-campaigns/:id', authMiddleware, async (req: any, res) => {
   try {
-    const { name, accountId, targetSource, manualTargets, selectedFollowers, pacing } = req.body;
+    const { name, accountId, targetSource, manualTargets, selectedFollowers } = req.body;
     
     const campaignCheck = await query('SELECT * FROM follow_campaigns WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
     if (!campaignCheck.rows[0]) return res.status(404).json({ error: 'Follow campaign not found' });
     
-    const pacingSettings = {
-      perMinute: pacing?.perMinute || 3,
-      delayMin: pacing?.delayMin || 15,
-      delayMax: pacing?.delayMax || 30,
-      dailyCap: pacing?.dailyCap || 50,
-      retryAttempts: pacing?.retryAttempts || 2
-    };
+    // Normalize settings from UI format (supports both 'settings' and 'pacing')
+    const pacingSettings = normalizeFollowSettings(req.body);
     
     await query(`
       UPDATE follow_campaigns SET 

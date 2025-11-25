@@ -29,18 +29,8 @@ export default function FollowCampaignDetail() {
       const { followCampaigns } = await import('@/lib/api');
       const data = await followCampaigns.get(Number(id));
       
-      // تحويل settings من database format إلى UI format
-      const formattedData = {
-        ...data,
-        settings: {
-          followsPerMinute: data.pacing_per_minute || 0,
-          dailyCap: data.pacing_daily_cap || 0,
-          randomDelay: data.pacing_delay_min !== data.pacing_delay_max, // If min != max, random is enabled
-          autoPauseOnHighFailure: false, // Not stored in DB yet
-        }
-      };
-      
-      setCampaign(formattedData);
+      // Settings are now formatted by the backend
+      setCampaign(data);
     } catch (error) {
       console.error('Error loading campaign:', error);
     } finally {
