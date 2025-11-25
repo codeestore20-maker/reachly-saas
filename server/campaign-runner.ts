@@ -134,8 +134,8 @@ async function processCampaign(campaignId: number) {
       SELECT COUNT(*) as count
       FROM targets
       WHERE campaign_id = $1 
-        AND DATE(last_attempt_at) = $2
-    `, [campaignId, today]);
+        AND last_attempt_at >= CURRENT_DATE
+    `, [campaignId]);
 
     const attemptsToday = attemptsTodayResult.rows[0];
 
