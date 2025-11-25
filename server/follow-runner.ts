@@ -125,8 +125,14 @@ async function processFollowCampaign(campaignId: number) {
       return;
     }
 
+    // Debug: Check what CURRENT_DATE is
+    const currentDateCheck = await query(`SELECT CURRENT_DATE AT TIME ZONE 'UTC' as current_date`);
+    console.log(`[DEBUG] Current date (UTC): ${currentDateCheck.rows[0].current_date}`);
+    
     const successfulFollowsResult = await query(`
-      SELECT COUNT(*) as count
+      SELECT COUNT(*) as count,
+             MIN(followed_at) as first_follow,
+             MAX(followed_at) as last_follow
       FROM follow_targets
       WHERE campaign_id = $1 
         AND status = 'followed'
@@ -136,6 +142,7 @@ async function processFollowCampaign(campaignId: number) {
     const successfulFollows = successfulFollowsResult.rows[0];
 
     console.log(`[Campaign ${campaignId}] Daily cap check: ${successfulFollows.count}/${campaign.pacing_daily_cap} successful follows today`);
+    console.log(`[DEBUG] First follow: ${successfulFollows.first_follow}, Last follow: ${successfulFollows.last_follow}`);
 
     if (successfulFollows.count >= campaign.pacing_daily_cap) {
       console.log(`⏸️  Follow campaign ${campaignId} reached daily cap - pausing until tomorrow`);
