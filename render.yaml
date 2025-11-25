@@ -14,9 +14,11 @@ services:
       - key: PORT
         value: 3001
       - key: JWT_SECRET
-        sync: false
+        # Set manually in Render Dashboard - will persist across restarts
       - key: COOKIE_ENCRYPTION_KEY
-        sync: false
+        # Set manually in Render Dashboard - will persist across restarts
+      - key: OLD_ENCRYPTION_KEYS
+        # Optional: comma-separated old keys for backward compatibility
       - key: DATABASE_URL
         fromDatabase:
           name: reachly-postgres
