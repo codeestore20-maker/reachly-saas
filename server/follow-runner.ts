@@ -135,6 +135,8 @@ async function processFollowCampaign(campaignId: number) {
 
     const attemptsToday = attemptsTodayResult.rows[0];
 
+    console.log(`[Campaign ${campaignId}] Daily cap check: ${attemptsToday.count}/${campaign.pacing_daily_cap} attempts today`);
+
     if (attemptsToday.count >= campaign.pacing_daily_cap) {
       console.log(`⏸️  Follow campaign ${campaignId} reached daily cap - pausing until tomorrow`);
       await pauseFollowCampaign(campaignId);
