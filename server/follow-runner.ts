@@ -126,18 +126,19 @@ async function processFollowCampaign(campaignId: number) {
     }
 
     const today = new Date().toISOString().split('T')[0];
-    const attemptsTodayResult = await query(`
+    const successfulFollowsResult = await query(`
       SELECT COUNT(*) as count
       FROM follow_targets
       WHERE campaign_id = $1 
-        AND last_attempt_at >= CURRENT_DATE
+        AND status = 'followed'
+        AND followed_at >= CURRENT_DATE
     `, [campaignId]);
 
-    const attemptsToday = attemptsTodayResult.rows[0];
+    const successfulFollows = successfulFollowsResult.rows[0];
 
-    console.log(`[Campaign ${campaignId}] Daily cap check: ${attemptsToday.count}/${campaign.pacing_daily_cap} attempts today`);
+    console.log(`[Campaign ${campaignId}] Daily cap check: ${successfulFollows.count}/${campaign.pacing_daily_cap} successful follows today`);
 
-    if (attemptsToday.count >= campaign.pacing_daily_cap) {
+    if (successfulFollows.count >= campaign.pacing_daily_cap) {
       console.log(`⏸️  Follow campaign ${campaignId} reached daily cap - pausing until tomorrow`);
       await pauseFollowCampaign(campaignId);
       processingFollowCampaigns.delete(campaignId);

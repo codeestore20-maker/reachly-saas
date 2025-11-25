@@ -130,16 +130,19 @@ async function processCampaign(campaignId: number) {
     }
 
     const today = new Date().toISOString().split('T')[0];
-    const attemptsTodayResult = await query(`
+    const successfulMessagesResult = await query(`
       SELECT COUNT(*) as count
       FROM targets
       WHERE campaign_id = $1 
-        AND last_attempt_at >= CURRENT_DATE
+        AND status = 'sent'
+        AND sent_at >= CURRENT_DATE
     `, [campaignId]);
 
-    const attemptsToday = attemptsTodayResult.rows[0];
+    const successfulMessages = successfulMessagesResult.rows[0];
 
-    if (attemptsToday.count >= campaign.pacing_daily_cap) {
+    console.log(`[Campaign ${campaignId}] Daily cap check: ${successfulMessages.count}/${campaign.pacing_daily_cap} successful messages today`);
+
+    if (successfulMessages.count >= campaign.pacing_daily_cap) {
       console.log(`⏸️  Campaign ${campaignId} reached daily cap (${campaign.pacing_daily_cap}) - pausing until tomorrow`);
       await pauseCampaign(campaignId);
       processingCampaigns.delete(campaignId);
