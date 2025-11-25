@@ -463,14 +463,15 @@ async function extractFollowersGraphQL(
 // متابعة مستخدم (Updated to use correct endpoint)
 export async function followUser(
   encryptedCookies: string,
-  targetUsername: string
+  targetUsername: string,
+  targetUserId?: string  // ← جديد: استخدم user_id من DB إن وجد
 ): Promise<{ success: boolean; error?: string; isRateLimit?: boolean }> {
   try {
     const cookiesStr = decrypt(encryptedCookies);
     const cookies: TwitterCookies = JSON.parse(cookiesStr);
     
-    // الحصول على user ID
-    const userId = await getUserId(targetUsername, cookies);
+    // استخدم user_id من DB إن وجد، وإلا ابحث عنه
+    const userId = targetUserId || await getUserId(targetUsername, cookies);
     
     // متابعة المستخدم عبر REST API v1.1
     const response = await fetch(

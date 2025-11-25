@@ -166,7 +166,7 @@ async function processFollowCampaign(campaignId: number) {
       WHERE id = $1
     `, [target.id]);
 
-    const result = await followUser(campaign.encrypted_cookies, target.username);
+    const result = await followUser(campaign.encrypted_cookies, target.username, target.user_id);
 
     // Handle rate limit with intelligent exponential backoff
     if (result.isRateLimit) {
