@@ -34,15 +34,49 @@ import {
 /**
  * Normalize follow campaign settings from various input formats
  * Accepts both 'settings' (from UI) and 'pacing' (legacy) formats
+ * Calculates delay from followsPerMinute to respect user settings
  */
 function normalizeFollowSettings(input: any) {
   const source = input.settings || input.pacing || {};
   
+  // Get follows per minute (primary control)
+  const perMinute = source.followsPerMinute || source.perMinute || 3;
+  
+  // Calculate base delay from follows per minute
+  const baseDelay = 60 / perMinute;  // seconds per follow
+  
+  // Apply random variation if enabled (±20%)
+  const randomDelay = source.randomDelay !== false;  // default true
+  
   return {
-    perMinute: source.followsPerMinute || source.perMinute || 3,
+    perMinute: perMinute,
     dailyCap: source.dailyCap || 50,
-    delayMin: source.randomDelay !== false ? 15 : 20,  // If randomDelay enabled or undefined, use 15
-    delayMax: source.randomDelay !== false ? 30 : 20,  // If randomDelay enabled or undefined, use 30
+    delayMin: randomDelay ? baseDelay * 0.8 : baseDelay,
+    delayMax: randomDelay ? baseDelay * 1.2 : baseDelay,
+    retryAttempts: source.retryAttempts || 2
+  };
+}
+
+/**
+ * Normalize DM campaign settings (similar to follow campaigns)
+ */
+function normalizeDMSettings(input: any) {
+  const source = input.settings || input.pacing || {};
+  
+  // Get messages per minute (primary control)
+  const perMinute = source.messagesPerMinute || source.perMinute || 15;
+  
+  // Calculate base delay from messages per minute
+  const baseDelay = 60 / perMinute;  // seconds per message
+  
+  // Apply random variation if enabled (±20%)
+  const randomDelay = source.randomDelay !== false;  // default true
+  
+  return {
+    perMinute: perMinute,
+    dailyCap: source.dailyCap || Math.floor((86400 / baseDelay) * 0.8),  // 80% of theoretical max
+    delayMin: randomDelay ? baseDelay * 0.8 : baseDelay,
+    delayMax: randomDelay ? baseDelay * 1.2 : baseDelay,
     retryAttempts: source.retryAttempts || 2
   };
 }
@@ -354,18 +388,8 @@ app.post('/api/campaigns', authMiddleware, checkLimit('create_dm_campaign'), asy
     const { name, accountId, tags, targetSource, manualTargets, selectedFollowers, message, pacing, isDraft } = req.body;
     if (!name || !accountId || !message) return res.status(400).json({ error: 'Missing required fields' });
     
-    // Default pacing values if not provided
-    const pacingSettings = {
-      perMinute: pacing?.perMinute || 15,
-      delayMin: pacing?.delayMin || 15,
-      delayMax: pacing?.delayMax || 30,
-      retryAttempts: pacing?.retryAttempts ?? 0
-    };
-    
-    // Calculate daily cap automatically based on delays
-    // 86400 seconds in a day / average delay = max messages per day
-    const avgDelay = (pacingSettings.delayMin + pacingSettings.delayMax) / 2;
-    const calculatedDailyCap = Math.floor(86400 / avgDelay);
+    // Normalize settings from UI format (supports both 'settings' and 'pacing')
+    const pacingSettings = normalizeDMSettings(req.body);
     
     // Set status based on isDraft flag
     const status = isDraft ? 'draft' : 'pending';
@@ -376,7 +400,7 @@ app.post('/api/campaigns', authMiddleware, checkLimit('create_dm_campaign'), asy
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id
     `, [req.user.id, accountId, name, status, targetSource, message, tags ? JSON.stringify(tags) : null,
         pacingSettings.perMinute, pacingSettings.delayMin, pacingSettings.delayMax, 
-        calculatedDailyCap, pacingSettings.retryAttempts]);
+        pacingSettings.dailyCap, pacingSettings.retryAttempts]);
     
     const campaignId = result.rows[0].id;
     let targets: any[] = [];
@@ -450,16 +474,8 @@ app.put('/api/campaigns/:id', authMiddleware, async (req: any, res) => {
     const campaignCheck = await query('SELECT * FROM campaigns WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
     if (!campaignCheck.rows[0]) return res.status(404).json({ error: 'Campaign not found' });
     
-    const pacingSettings = {
-      perMinute: pacing?.perMinute || 15,
-      delayMin: pacing?.delayMin || 15,
-      delayMax: pacing?.delayMax || 30,
-      retryAttempts: pacing?.retryAttempts ?? 0
-    };
-    
-    // Calculate daily cap automatically
-    const avgDelay = (pacingSettings.delayMin + pacingSettings.delayMax) / 2;
-    const calculatedDailyCap = Math.floor(86400 / avgDelay);
+    // Normalize settings from UI format (supports both 'settings' and 'pacing')
+    const pacingSettings = normalizeDMSettings(req.body);
     
     await query(`
       UPDATE campaigns SET 
@@ -469,7 +485,7 @@ app.put('/api/campaigns/:id', authMiddleware, async (req: any, res) => {
       WHERE id = $11 AND user_id = $12
     `, [name, accountId, tags ? JSON.stringify(tags) : null, targetSource, message,
         pacingSettings.perMinute, pacingSettings.delayMin, pacingSettings.delayMax,
-        calculatedDailyCap, pacingSettings.retryAttempts, req.params.id, req.user.id]);
+        pacingSettings.dailyCap, pacingSettings.retryAttempts, req.params.id, req.user.id]);
     
     // Update targets if provided
     if (targetSource === 'manual' && manualTargets) {
