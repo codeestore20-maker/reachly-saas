@@ -125,9 +125,8 @@ async function processFollowCampaign(campaignId: number) {
       return;
     }
 
-    // Debug: Check what CURRENT_DATE is
-    const currentDateCheck = await query(`SELECT CURRENT_DATE AT TIME ZONE 'UTC' as current_date`);
-    console.log(`[DEBUG] Current date (UTC): ${currentDateCheck.rows[0].current_date}`);
+    // Debug: Check campaign settings
+    console.log(`[DEBUG Campaign ${campaignId}] Settings: ${campaign.pacing_per_minute}/min, ${campaign.pacing_daily_cap} daily cap`);
     
     const successfulFollowsResult = await query(`
       SELECT COUNT(*) as count,
