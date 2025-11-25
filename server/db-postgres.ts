@@ -386,6 +386,26 @@ export async function initializeDatabase(): Promise<void> {
       logger.warn('Follow_targets updated_at column migration skipped');
     }
 
+    // Add rate limit tracking columns for intelligent backoff (migration)
+    try {
+      await query(`ALTER TABLE follow_campaigns ADD COLUMN IF NOT EXISTS rate_limit_count INTEGER DEFAULT 0`);
+      await query(`ALTER TABLE follow_campaigns ADD COLUMN IF NOT EXISTS last_rate_limit_at TIMESTAMP`);
+      await query(`ALTER TABLE follow_campaigns ADD COLUMN IF NOT EXISTS successful_actions_since_rate_limit INTEGER DEFAULT 0`);
+      logger.info('✅ Rate limit tracking columns added to follow_campaigns');
+    } catch (error) {
+      logger.warn('Follow_campaigns rate limit columns migration skipped');
+    }
+
+    // Add rate limit tracking columns for DM campaigns (migration)
+    try {
+      await query(`ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS rate_limit_count INTEGER DEFAULT 0`);
+      await query(`ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS last_rate_limit_at TIMESTAMP`);
+      await query(`ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS successful_actions_since_rate_limit INTEGER DEFAULT 0`);
+      logger.info('✅ Rate limit tracking columns added to campaigns');
+    } catch (error) {
+      logger.warn('Campaigns rate limit columns migration skipped');
+    }
+
     await query(`
       CREATE TABLE IF NOT EXISTS followers (
         id SERIAL PRIMARY KEY,

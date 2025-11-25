@@ -12,6 +12,9 @@ interface FollowCampaignConfig {
   pacing_delay_min: number;
   pacing_delay_max: number;
   pacing_retry_attempts: number;
+  rate_limit_count?: number;
+  last_rate_limit_at?: Date;
+  successful_actions_since_rate_limit?: number;
 }
 
 interface FollowLog {
@@ -22,6 +25,16 @@ interface FollowLog {
 const runningFollowCampaigns = new Map<number, NodeJS.Timeout>();
 const followLog = new Map<number, FollowLog[]>();
 const processingFollowCampaigns = new Set<number>();
+
+/**
+ * Calculate intelligent backoff time based on consecutive rate limits
+ * Uses exponential backoff: 1min → 3min → 9min → 15min (max)
+ */
+function calculateBackoffMinutes(consecutiveRateLimits: number): number {
+  const backoffLevels = [1, 3, 9, 15]; // minutes
+  const index = Math.min(consecutiveRateLimits - 1, backoffLevels.length - 1);
+  return backoffLevels[Math.max(0, index)];
+}
 
 export async function startFollowCampaign(campaignId: number) {
   if (runningFollowCampaigns.has(campaignId)) {
@@ -153,7 +166,35 @@ async function processFollowCampaign(campaignId: number) {
 
     const result = await followUser(campaign.encrypted_cookies, target.username);
 
-    if (result.success) {
+    // Handle rate limit with intelligent exponential backoff
+    if (result.isRateLimit) {
+      const rateLimitCount = (campaign.rate_limit_count || 0) + 1;
+      const backoffMinutes = calculateBackoffMinutes(rateLimitCount);
+      
+      console.log(`⏸️  [Follow Campaign ${campaignId}] Rate limit #${rateLimitCount} detected - pausing for ${backoffMinutes} minute(s)`);
+      
+      // Update rate limit tracking (don't count as retry attempt)
+      await query(`
+        UPDATE follow_campaigns 
+        SET rate_limit_count = $1, 
+            last_rate_limit_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      `, [rateLimitCount, campaignId]);
+      
+      // Reset target retry count (rate limit is not target's fault)
+      await query(`
+        UPDATE follow_targets
+        SET retry_count = GREATEST(retry_count - 1, 0),
+            error_message = $1
+        WHERE id = $2
+      `, ['Rate limit - will retry after backoff', target.id]);
+      
+      // Wait with exponential backoff
+      await new Promise(resolve => setTimeout(resolve, backoffMinutes * 60 * 1000));
+      
+      console.log(`▶️  [Follow Campaign ${campaignId}] Resuming after rate limit backoff`);
+      
+    } else if (result.success) {
       logFollow(campaignId);
       
       await query(`
@@ -174,8 +215,30 @@ async function processFollowCampaign(campaignId: number) {
         await incrementUsage(campaignUserResult.rows[0].user_id, 'follows');
       }
 
+      // Track successful actions for rate limit reset
+      const successCount = (campaign.successful_actions_since_rate_limit || 0) + 1;
+      
+      // Reset rate limit counter after 10 consecutive successes
+      if (successCount >= 10 && campaign.rate_limit_count > 0) {
+        await query(`
+          UPDATE follow_campaigns 
+          SET rate_limit_count = 0,
+              successful_actions_since_rate_limit = 0
+          WHERE id = $1
+        `, [campaignId]);
+        console.log(`🔄 [Follow Campaign ${campaignId}] Rate limit counter reset - system stable`);
+      } else {
+        await query(`
+          UPDATE follow_campaigns 
+          SET successful_actions_since_rate_limit = $1
+          WHERE id = $2
+        `, [successCount, campaignId]);
+      }
+
       console.log(`✅ [Follow Campaign ${campaignId}] Followed ${target.username}`);
+      
     } else {
+      // Handle other errors (not rate limit)
       const currentRetryCount = target.retry_count || 0;
       
       if (currentRetryCount >= campaign.pacing_retry_attempts) {
@@ -191,7 +254,7 @@ async function processFollowCampaign(campaignId: number) {
           WHERE id = $1
         `, [campaignId]);
 
-        console.log(`❌ [Follow Campaign ${campaignId}] Failed to follow ${target.username}`);
+        console.log(`❌ [Follow Campaign ${campaignId}] Failed to follow ${target.username}: ${result.error}`);
       } else {
         await query(`
           UPDATE follow_targets
@@ -199,10 +262,11 @@ async function processFollowCampaign(campaignId: number) {
           WHERE id = $2
         `, [result.error || 'Unknown error', target.id]);
 
-        console.log(`⚠️  [Follow Campaign ${campaignId}] Failed to follow ${target.username}, will retry`);
+        console.log(`⚠️  [Follow Campaign ${campaignId}] Failed to follow ${target.username}, will retry (${currentRetryCount}/${campaign.pacing_retry_attempts})`);
       }
     }
 
+    // Always respect campaign settings for delay (unchanged)
     const delay = campaign.pacing_delay_min + Math.random() * (campaign.pacing_delay_max - campaign.pacing_delay_min);
     await new Promise(resolve => setTimeout(resolve, delay * 1000));
 

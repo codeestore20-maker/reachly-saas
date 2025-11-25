@@ -236,7 +236,7 @@ export async function sendDM(
   encryptedCookies: string,
   recipientUsername: string,
   message: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; isRateLimit?: boolean }> {
   try {
     const cookiesStr = decrypt(encryptedCookies);
     const cookies: TwitterCookies = JSON.parse(cookiesStr);
@@ -272,6 +272,16 @@ export async function sendDM(
       const errorText = await response.text();
       console.error('Send DM error - Status:', response.status);
       console.error('Send DM error - Body:', errorText || '(empty response)');
+      
+      // Detect rate limit (429) for intelligent handling
+      if (response.status === 429) {
+        return { 
+          success: false,
+          isRateLimit: true,
+          error: 'Rate limit exceeded'
+        };
+      }
+      
       return { 
         success: false, 
         error: `HTTP ${response.status}: ${errorText || 'Empty response'}` 
@@ -454,7 +464,7 @@ async function extractFollowersGraphQL(
 export async function followUser(
   encryptedCookies: string,
   targetUsername: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; isRateLimit?: boolean }> {
   try {
     const cookiesStr = decrypt(encryptedCookies);
     const cookies: TwitterCookies = JSON.parse(cookiesStr);
@@ -477,6 +487,16 @@ export async function followUser(
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Follow user error:', errorText);
+      
+      // Detect rate limit (429) for intelligent handling
+      if (response.status === 429) {
+        return { 
+          success: false,
+          isRateLimit: true,
+          error: 'Rate limit exceeded'
+        };
+      }
+      
       return { 
         success: false, 
         error: `HTTP ${response.status}: ${errorText.substring(0, 100)}` 

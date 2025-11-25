@@ -13,6 +13,9 @@ interface CampaignConfig {
   pacing_delay_max: number;
   pacing_daily_cap: number;
   pacing_retry_attempts: number;
+  rate_limit_count?: number;
+  last_rate_limit_at?: Date;
+  successful_actions_since_rate_limit?: number;
 }
 
 interface MessageLog {
@@ -23,6 +26,16 @@ interface MessageLog {
 const runningCampaigns = new Map<number, NodeJS.Timeout>();
 const messageLog = new Map<number, MessageLog[]>();
 const processingCampaigns = new Set<number>();
+
+/**
+ * Calculate intelligent backoff time based on consecutive rate limits
+ * Uses exponential backoff: 1min → 3min → 9min → 15min (max)
+ */
+function calculateBackoffMinutes(consecutiveRateLimits: number): number {
+  const backoffLevels = [1, 3, 9, 15]; // minutes
+  const index = Math.min(consecutiveRateLimits - 1, backoffLevels.length - 1);
+  return backoffLevels[Math.max(0, index)];
+}
 
 // بدء حملة
 export async function startCampaign(campaignId: number) {
@@ -189,10 +202,38 @@ async function processCampaign(campaignId: number) {
 
     const result = await sendDM(campaign.encrypted_cookies, target.username, message);
 
-    // Calculate delay for this attempt (always use configured delay)
+    // Calculate delay for this attempt (always use configured delay - respects campaign settings)
     const delay = campaign.pacing_delay_min + Math.random() * (campaign.pacing_delay_max - campaign.pacing_delay_min);
 
-    if (result.success) {
+    // Handle rate limit with intelligent exponential backoff
+    if (result.isRateLimit) {
+      const rateLimitCount = (campaign.rate_limit_count || 0) + 1;
+      const backoffMinutes = calculateBackoffMinutes(rateLimitCount);
+      
+      console.log(`⏸️  [Campaign ${campaignId}] Rate limit #${rateLimitCount} detected - pausing for ${backoffMinutes} minute(s)`);
+      
+      // Update rate limit tracking (don't count as retry attempt)
+      await query(`
+        UPDATE campaigns 
+        SET rate_limit_count = $1, 
+            last_rate_limit_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+      `, [rateLimitCount, campaignId]);
+      
+      // Reset target retry count (rate limit is not target's fault)
+      await query(`
+        UPDATE targets
+        SET retry_count = GREATEST(retry_count - 1, 0),
+            error_message = $1
+        WHERE id = $2
+      `, ['Rate limit - will retry after backoff', target.id]);
+      
+      // Wait with exponential backoff
+      await new Promise(resolve => setTimeout(resolve, backoffMinutes * 60 * 1000));
+      
+      console.log(`▶️  [Campaign ${campaignId}] Resuming after rate limit backoff`);
+      
+    } else if (result.success) {
       logMessage(campaignId);
       
       await query(`
@@ -213,9 +254,30 @@ async function processCampaign(campaignId: number) {
         await incrementUsage(campaignUserResult.rows[0].user_id, 'dms');
       }
 
+      // Track successful actions for rate limit reset
+      const successCount = (campaign.successful_actions_since_rate_limit || 0) + 1;
+      
+      // Reset rate limit counter after 10 consecutive successes
+      if (successCount >= 10 && campaign.rate_limit_count > 0) {
+        await query(`
+          UPDATE campaigns 
+          SET rate_limit_count = 0,
+              successful_actions_since_rate_limit = 0
+          WHERE id = $1
+        `, [campaignId]);
+        console.log(`🔄 [Campaign ${campaignId}] Rate limit counter reset - system stable`);
+      } else {
+        await query(`
+          UPDATE campaigns 
+          SET successful_actions_since_rate_limit = $1
+          WHERE id = $2
+        `, [successCount, campaignId]);
+      }
+
       console.log(`✅ [Campaign ${campaignId}] Sent to ${target.username}`);
       console.log(`⏳ [Campaign ${campaignId}] Waiting ${delay.toFixed(1)}s before next message`);
       await new Promise(resolve => setTimeout(resolve, delay * 1000));
+      
     } else {
       // Check for permanent errors that shouldn't be retried
       const isPermanentError = result.error?.includes('403') || 
