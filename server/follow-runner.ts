@@ -125,13 +125,12 @@ async function processFollowCampaign(campaignId: number) {
       return;
     }
 
-    const today = new Date().toISOString().split('T')[0];
     const successfulFollowsResult = await query(`
       SELECT COUNT(*) as count
       FROM follow_targets
       WHERE campaign_id = $1 
         AND status = 'followed'
-        AND followed_at >= CURRENT_DATE
+        AND followed_at >= CURRENT_DATE AT TIME ZONE 'UTC'
     `, [campaignId]);
 
     const successfulFollows = successfulFollowsResult.rows[0];

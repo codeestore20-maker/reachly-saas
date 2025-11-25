@@ -129,13 +129,12 @@ async function processCampaign(campaignId: number) {
       return;
     }
 
-    const today = new Date().toISOString().split('T')[0];
     const successfulMessagesResult = await query(`
       SELECT COUNT(*) as count
       FROM targets
       WHERE campaign_id = $1 
         AND status = 'sent'
-        AND sent_at >= CURRENT_DATE
+        AND sent_at >= CURRENT_DATE AT TIME ZONE 'UTC'
     `, [campaignId]);
 
     const successfulMessages = successfulMessagesResult.rows[0];
