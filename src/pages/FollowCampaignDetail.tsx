@@ -33,10 +33,10 @@ export default function FollowCampaignDetail() {
       const formattedData = {
         ...data,
         settings: {
-          followsPerMinute: data.settings_follows_per_minute,
-          dailyCap: data.settings_daily_cap,
-          randomDelay: data.settings_random_delay === 1,
-          autoPauseOnHighFailure: data.settings_auto_pause === 1,
+          followsPerMinute: data.pacing_per_minute || 0,
+          dailyCap: data.pacing_daily_cap || 0,
+          randomDelay: data.pacing_delay_min !== data.pacing_delay_max, // If min != max, random is enabled
+          autoPauseOnHighFailure: false, // Not stored in DB yet
         }
       };
       

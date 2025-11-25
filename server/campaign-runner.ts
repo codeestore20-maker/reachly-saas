@@ -164,8 +164,9 @@ async function processCampaign(campaignId: number) {
     const target = targetResult.rows[0];
 
     if (!target) {
-      console.log(`✅ Campaign ${campaignId} completed - no more targets`);
+      console.log(`✅ Campaign ${campaignId} completed - all targets processed`);
       stopCampaign(campaignId);
+      processingCampaigns.delete(campaignId);
       return;
     }
 

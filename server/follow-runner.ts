@@ -154,8 +154,9 @@ async function processFollowCampaign(campaignId: number) {
     const target = targetResult.rows[0];
 
     if (!target) {
-      console.log(`✅ Follow campaign ${campaignId} completed`);
+      console.log(`✅ Follow campaign ${campaignId} completed - all targets processed`);
       stopFollowCampaign(campaignId);
+      processingFollowCampaigns.delete(campaignId);
       return;
     }
 
