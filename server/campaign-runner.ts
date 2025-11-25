@@ -140,7 +140,8 @@ async function processCampaign(campaignId: number) {
     const attemptsToday = attemptsTodayResult.rows[0];
 
     if (attemptsToday.count >= campaign.pacing_daily_cap) {
-      console.log(`⏸️  Campaign ${campaignId} reached daily cap (${campaign.pacing_daily_cap})`);
+      console.log(`⏸️  Campaign ${campaignId} reached daily cap (${campaign.pacing_daily_cap}) - pausing until tomorrow`);
+      await pauseCampaign(campaignId);
       processingCampaigns.delete(campaignId);
       return;
     }

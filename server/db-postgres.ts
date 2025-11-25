@@ -159,7 +159,7 @@ export function decrypt(text: string): string {
 /**
  * Execute a query with automatic connection handling
  */
-export async function query(text: string, params?: any[]): Promise<unknown> {
+export async function query(text: string, params?: unknown[]): Promise<unknown> {
   const start = Date.now();
   try {
     const res = await pool.query(text, params);
