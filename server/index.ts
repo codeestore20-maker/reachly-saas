@@ -51,8 +51,8 @@ function normalizeFollowSettings(input: any) {
   return {
     perMinute: perMinute,
     dailyCap: source.dailyCap || 50,
-    delayMin: randomDelay ? baseDelay * 0.8 : baseDelay,
-    delayMax: randomDelay ? baseDelay * 1.2 : baseDelay,
+    delayMin: Math.round(randomDelay ? baseDelay * 0.8 : baseDelay),
+    delayMax: Math.round(randomDelay ? baseDelay * 1.2 : baseDelay),
     retryAttempts: source.retryAttempts || 2
   };
 }
@@ -75,8 +75,8 @@ function normalizeDMSettings(input: any) {
   return {
     perMinute: perMinute,
     dailyCap: source.dailyCap || Math.floor((86400 / baseDelay) * 0.8),  // 80% of theoretical max
-    delayMin: randomDelay ? baseDelay * 0.8 : baseDelay,
-    delayMax: randomDelay ? baseDelay * 1.2 : baseDelay,
+    delayMin: Math.round(randomDelay ? baseDelay * 0.8 : baseDelay),
+    delayMax: Math.round(randomDelay ? baseDelay * 1.2 : baseDelay),
     retryAttempts: source.retryAttempts || 2
   };
 }
